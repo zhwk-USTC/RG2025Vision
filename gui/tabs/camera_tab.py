@@ -1,7 +1,9 @@
 from nicegui import ui
 import numpy as np
 from PIL import Image
+
 from vision.camera import cameras
+from core.logger import logger
 
 
 def np_to_pil(img_np):
@@ -14,6 +16,24 @@ def np_to_pil(img_np):
 
 def get_placeholder_img():
     return Image.open("assets/no_signal.png").convert("RGB")
+
+
+def prepare_image_for_display(img_np):
+    """将numpy数组或PIL图像转换为适合显示的PIL格式"""
+    pil_img = np_to_pil(img_np)
+    
+    # 缩放到最大宽度 320px
+    max_width = 320
+    if pil_img.width > max_width:
+        ratio = max_width / pil_img.width
+        new_size = (max_width, int(pil_img.height * ratio))
+        pil_img = pil_img.resize(new_size)
+    
+    # 转换为RGB格式（如果需要）
+    if pil_img.mode != 'RGB':
+        pil_img = pil_img.convert('RGB')
+    
+    return pil_img
 
 
 def get_camera_imgs():
@@ -32,8 +52,12 @@ def get_camera_imgs():
             cam, 'actual_fps', None) else "帧率: -"
         actual_fps_str = f"实际帧率: {cam.actual_fps:.1f}" if getattr(
             cam, 'actual_fps', None) else "实际帧率: -"
-        text = f"{res_str}\n{fps_str}\n{actual_fps_str}\n{tag36h11_result}"
-        results.append((img, overlay, text))
+        camera_info = f"{res_str}\n{fps_str}\n{actual_fps_str}"
+        
+        # 检测结果
+        detection_result = tag36h11_result
+        
+        results.append((img, overlay, camera_info, detection_result))
     return results
 
 
@@ -45,10 +69,13 @@ def render_camera_tab():
                   cam.connect() for cam in cameras])
         ui.button('断开所有摄像头', color='negative', on_click=lambda: [
                   cam.disconnect() for cam in cameras])
+        
     cam_names = [cam.alias for cam in cameras]
-    img_elems = []
-    overlay_elems = []
-    text_widgets = []
+    img_widgets = []
+    overlay_widgets = []
+    camera_info_widgets = []
+    detection_result_widgets = []
+    
     with ui.column():
         for i, name in enumerate(cam_names):
             cam = cameras[i]
@@ -64,52 +91,50 @@ def render_camera_tab():
                         cam.disconnect()
                     connect_btn.on('click', lambda e, cam=cam: on_connect_click(cam))
                     disconnect_btn.on('click', lambda e, cam=cam: on_disconnect_click(cam))
-                with ui.row().classes('q-gutter-md'):
-                    img_id = f"cam_img_{i}"
-                    img_elem = ui.html(
-                        f'<img id="{img_id}" style="width:100%;max-width:320px;height:auto;object-fit:contain;background:#222;display:block;">')
-                    img_elems.append(img_id)
-                    overlay_id = f"cam_overlay_{i}"
-                    overlay_elem = ui.html(
-                        f'<img id="{overlay_id}" style="width:100%;max-width:320px;height:auto;object-fit:contain;background:#444;display:block;">')
-                    overlay_elems.append(overlay_id)
-                    text_widget = ui.textarea('').props('label=检测结果 readonly').classes(
-                        'bg-grey-2 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:200px;min-height:200px;')
-                    text_widgets.append(text_widget)
+                
+                placeholder_img = prepare_image_for_display(np.array(get_placeholder_img()))
+                
+                with ui.row().classes('q-gutter-sm'):
+                    with ui.column().classes('q-gutter-sm'):
+                        ui.label('原图').classes('text-subtitle2')
+                        img_widget = ui.interactive_image(
+                            placeholder_img
+                        ).classes('max-w-80').style('max-width: 320px; height: auto;')
+                        img_widgets.append(img_widget)
+                    
+                    with ui.column().classes('q-gutter-sm'):
+                        ui.label('检测叠加').classes('text-subtitle2')
+                        overlay_widget = ui.interactive_image(
+                            placeholder_img
+                        ).classes('max-w-80').style('max-width: 320px; height: auto;')
+                        overlay_widgets.append(overlay_widget)
+                    
+                    
+                    camera_info_widget = ui.textarea('').props('label=摄像头信息 readonly').classes(
+                        'bg-blue-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:150px;min-height:100px;flex:1;')
+                    camera_info_widgets.append(camera_info_widget)
+                    
+                    detection_result_widget = ui.textarea('').props('label=检测结果 readonly').classes(
+                        'bg-green-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:150px;min-height:100px;flex:1;')
+                    detection_result_widgets.append(detection_result_widget)
 
-    import io
-    import base64
-
-    def pil_to_base64(img):
-        # 先缩放到最大宽度 320px，再压缩
-        max_width = 480
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_size = (max_width, int(img.height * ratio))
-            resample = Image.Resampling.LANCZOS
-            img = img.resize(new_size, resample)
-        buf = io.BytesIO()
-        img.save(buf, format='JPEG', quality=80)
-        return base64.b64encode(buf.getvalue()).decode('utf-8')
     
     def update_imgs():
         results = get_camera_imgs()
-        for i, (img, overlay, text) in enumerate(results):
+        for i, (img, overlay, camera_info, detection_result) in enumerate(results):
             cam = cameras[i]
             
             # 原图
-            pil_img = np_to_pil(img)
-            b64 = pil_to_base64(pil_img)
-            ui.run_javascript(
-                f'document.getElementById("{img_elems[i]}").src = "data:image/jpeg;base64,{b64}";')
+            processed_img = prepare_image_for_display(img)
+            img_widgets[i].set_source(processed_img)
             
             # 叠加层
-            pil_overlay = np_to_pil(overlay)
-            b64_overlay = pil_to_base64(pil_overlay)
-            ui.run_javascript(
-                f'document.getElementById("{overlay_elems[i]}").src = "data:image/jpeg;base64,{b64_overlay}";')
+            processed_overlay = prepare_image_for_display(overlay)
+            overlay_widgets[i].set_source(processed_overlay)
             
-            # 文本
-            text_widgets[i].set_value(text)
+            # 摄像头信息
+            camera_info_widgets[i].set_value(camera_info)
+            # 检测结果
+            detection_result_widgets[i].set_value(detection_result)
 
     ui.timer(1.0/10, update_imgs)  # 30Hz刷新

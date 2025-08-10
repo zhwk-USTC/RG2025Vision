@@ -1,6 +1,4 @@
 import threading
-import asyncio
-import time
 
 from gui.gui_app import launch as gui_launch
 from communicate.uart import run_uart

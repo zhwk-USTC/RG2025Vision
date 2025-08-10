@@ -137,4 +137,4 @@ def render_camera_tab():
             # 检测结果
             detection_result_widgets[i].set_value(detection_result)
 
-    ui.timer(1.0/10, update_imgs)  # 30Hz刷新
+    ui.timer(1.0/5, update_imgs)  # 30Hz刷新

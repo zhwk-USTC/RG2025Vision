@@ -72,4 +72,6 @@ def about_page():
     render_about_tab()
 
 def launch():
+    from . import set_ui_running
+    set_ui_running(True)
     ui.run(host='0.0.0.0', port=8080, show=False)

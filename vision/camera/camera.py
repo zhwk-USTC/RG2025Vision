@@ -1,10 +1,12 @@
 import cv2
 import time
-import logging
-import hashlib
 import platform
+import os
+from dataclasses import dataclass
 from cv2_enumerate_cameras import enumerate_cameras
 from core.logger import logger
+import json
+
 camera_info_list = []
 
 
@@ -24,10 +26,10 @@ def setup_camera_info():
     for info in camera_info_list:
         info.name = info.name + f" ({info.index})"
 
-    logger.info(f"已找到 {len(camera_info_list)} 个摄像头", notify_gui=False)
+    logger.info(f"已找到 {len(camera_info_list)} 个摄像头")
     for idx, info in enumerate(camera_info_list):
         name = getattr(info, 'name', None)
-        logger.info(f"  [{idx}] {name if name else info}", notify_gui=False)
+        logger.info(f"  [{idx}] {name if name else info}")
 
 
 setup_camera_info()
@@ -94,7 +96,7 @@ class Camera:
             # Linux优化：设置视频格式为MJPEG以提高性能
             if platform.system() == "Linux":
                 # 尝试设置MJPEG格式以减少带宽需求
-                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')) #type: ignore
             
             # 应用分辨率设置
             if self.width and self.height:
@@ -179,10 +181,9 @@ class Camera:
         self.latest_frame = rgb_frame.copy()
         return rgb_frame
 
-# ====== 全局摄像头管理 ======
+# CameraIntrinsics 已移至 intrinsics.py
 
-
-cameras: list[Camera] = [Camera(), Camera(), Camera()]  # 前中后
+# ====== 配置路径 ======
 
 import os
 
@@ -192,11 +193,16 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 
 CAMERA_CONFIG_PATH = os.path.join(CONFIG_DIR, 'camera_config.json')
 
-def save_config():
-    """保存摄像头配置"""
+def save_config(cameras_list: list[Camera], config_path: str = CAMERA_CONFIG_PATH):
+    """保存摄像头配置
+    
+    Args:
+        cameras_list: 要保存配置的摄像头列表
+        config_path: 配置文件路径，默认使用全局配置路径
+    """
     import json
     config = []
-    for cam in cameras:
+    for cam in cameras_list:
         config.append({
             'alias': cam.alias,
             'path': cam.info.path if cam.info else None,
@@ -205,39 +211,54 @@ def save_config():
             'fps': cam.fps,
             'tag36h11_enabled': cam.tag36h11_enabled
         })
-    with open(CAMERA_CONFIG_PATH, 'w', encoding='utf-8') as f:
+    with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
-    abs_path = os.path.abspath(CAMERA_CONFIG_PATH)
+    abs_path = os.path.abspath(config_path)
     logger.info(f"摄像头配置已保存到 {abs_path}")
 
 
-def load_config():
-    """加载摄像头配置"""
-    import json
-    if not os.path.exists(CAMERA_CONFIG_PATH):
-        return
-    with open(CAMERA_CONFIG_PATH, 'r', encoding='utf-8') as f:
-        config = json.load(f)
-    for i, cam_cfg in enumerate(config):
-        if i >= len(cameras):
-            break
-        cam = cameras[i]
-        # 先根据 path 匹配摄像头
-        path = cam_cfg.get('path')
-        if path:
-            for info in camera_info_list:
-                if hasattr(info, 'path') and info.path == path:
-                    cam.info = info
-                    break
-        cam.alias = cam_cfg.get('alias')
-        cam.width = cam_cfg.get('width')
-        cam.height = cam_cfg.get('height')
-        cam.fps = cam_cfg.get('fps')
-        cam.tag36h11_enabled = cam_cfg.get('tag36h11_enabled', True)
-        logger.info(
-            f"摄像头 {i} 配置已加载: {cam.alias} ({cam.info.name if cam.info else '未知'}) ({cam.width}x{cam.height} @ {cam.fps}fps)",
-            notify_gui=False
-        )
-
-
-load_config()
+def load_config(cameras_list: list[Camera], config_path: str = CAMERA_CONFIG_PATH):
+    """加载摄像头配置
+    
+    Args:
+        cameras_list: 要加载配置的摄像头列表
+        config_path: 配置文件路径，默认使用全局配置路径
+        
+    Returns:
+        bool: 是否成功加载配置
+    """
+    if not os.path.exists(config_path):
+        return False
+        
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            
+        for i, cam_cfg in enumerate(config):
+            if i >= len(cameras_list):
+                break
+                
+            cam = cameras_list[i]
+            
+            # 先根据 path 匹配摄像头
+            path = cam_cfg.get('path')
+            if path:
+                for info in camera_info_list:
+                    if hasattr(info, 'path') and info.path == path:
+                        cam.info = info
+                        break
+                        
+            cam.alias = cam_cfg.get('alias')
+            cam.width = cam_cfg.get('width')
+            cam.height = cam_cfg.get('height')
+            cam.fps = cam_cfg.get('fps')
+            cam.tag36h11_enabled = cam_cfg.get('tag36h11_enabled', True)
+            
+            logger.info(
+                f"摄像头 {i} 配置已加载: {cam.alias} ({cam.info.name if cam.info else '未知'}) ({cam.width}x{cam.height} @ {cam.fps}fps)",
+                notify_gui=False
+            )
+        return True
+    except Exception as e:
+        logger.error(f"加载摄像头配置失败: {e}")
+        return False

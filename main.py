@@ -11,11 +11,11 @@ def main():
     # t_uart.start()
     t_vision.start()
 
-    logger.debug("所有子线程已启动，启动GUI...", notify_gui=False)
+    logger.debug("所有子线程已启动，准备启动GUI...")
     try:
         gui_launch()
     except KeyboardInterrupt:
-        logger.info('主进程退出', notify_gui=False)
+        logger.info('主进程退出')
 
 if __name__ in {"__main__", "__mp_main__"}:
     main()

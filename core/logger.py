@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime
 from nicegui import ui
+import gui
 
 CONSOLE_LOG_LEVEL = logging.INFO
 FILE_LOG_LEVEL = logging.WARNING
@@ -39,25 +40,25 @@ class Logger:
 
         # UI日志级别
         self.ui_level = ui_level
-
-    def debug(self, msg, *args, notify_gui=True, **kwargs):
+    
+    def debug(self, msg, *args, **kwargs):
         self.logger.debug(msg, *args, **kwargs)
-        if notify_gui and logging.DEBUG >= self.ui_level:
+        if logging.DEBUG >= self.ui_level and gui.is_ui_running():
             ui.notify(str(msg), type='positive')
-
-    def info(self, msg, *args, notify_gui=True, **kwargs):
+            
+    def info(self, msg, *args, **kwargs):
         self.logger.info(msg, *args, **kwargs)
-        if notify_gui and logging.INFO >= self.ui_level:
+        if logging.INFO >= self.ui_level and gui.is_ui_running():
             ui.notify(str(msg), type='info')
 
-    def warning(self, msg, *args, notify_gui=True, **kwargs):
+    def warning(self, msg, *args, **kwargs):
         self.logger.warning(msg, *args, **kwargs)
-        if notify_gui and logging.WARNING >= self.ui_level:
+        if logging.WARNING >= self.ui_level and gui.is_ui_running():
             ui.notify(str(msg), type='warning')
 
-    def error(self, msg, *args, notify_gui=True, **kwargs):
+    def error(self, msg, *args, **kwargs):
         self.logger.error(msg, *args, **kwargs)
-        if notify_gui and logging.ERROR >= self.ui_level:
+        if logging.ERROR >= self.ui_level and gui.is_ui_running():
             ui.notify(str(msg), type='negative')
 
 # 单例

@@ -5,10 +5,7 @@
 """
 
 from dataclasses import dataclass, asdict
-import json
-import os
 import numpy as np
-from core.logger import logger
 
 
 @dataclass
@@ -90,76 +87,4 @@ class CameraIntrinsics:
         # 同步更新dataclass的属性
         self.width = width
         self.height = height
-        
-    
-    def save(self, file_path):
-        """保存内参到文件"""
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(asdict(self), f, indent=2)
-            logger.info(f"相机内参已保存到 {file_path}")
-            return True
-        except Exception as e:
-            logger.error(f"保存相机内参失败: {e}")
-            return False
-    
-    @classmethod
-    def load(cls, file_path):
-        """从文件加载内参
-        
-        Args:
-            file_path: 内参文件路径
-            
-        Returns:
-            CameraIntrinsics: 成功则返回相机内参对象，失败则返回None
-        """
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                
-            # 获取类的字段名列表
-            import inspect
-            params = inspect.signature(cls).parameters
-            valid_fields = list(params.keys())
-            
-            # 过滤出有效的字段
-            filtered_data = {k: v for k, v in data.items() if k in valid_fields}
-            
-            # 确保必需字段都存在
-            required_fields = [name for name, param in params.items() 
-                              if param.default == inspect.Parameter.empty]
-            missing = [field for field in required_fields if field not in filtered_data]
-            
-            if missing:
-                # 如果缺少必要字段，尝试兼容旧格式
-                if 'width' in missing and 'image_width' in data:
-                    filtered_data['width'] = data['image_width']
-                if 'height' in missing and 'image_height' in data:
-                    filtered_data['height'] = data['image_height']
-                    
-                # 重新检查是否还有缺失字段
-                missing = [field for field in required_fields if field not in filtered_data]
-                
-                # 如果仍然有缺失，返回None
-                if missing:
-                    logger.warning(f"相机内参文件缺少必需字段: {missing}")
-                    return None
-            
-            # 创建对象
-            intrinsics = cls(**filtered_data)
-            logger.info(f"相机内参已从 {file_path} 加载")
-            return intrinsics
-        except Exception as e:
-            logger.error(f"加载相机内参失败: {e}")
-            return None
 
-
-# 创建默认内参实例，供其他模块使用
-DEFAULT_INTRINSICS = CameraIntrinsics(
-    width=640,
-    height=480,
-    fx=0.0,
-    fy=0.0,
-    cx=0.0,
-    cy=0.0
-)

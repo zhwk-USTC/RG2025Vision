@@ -7,6 +7,7 @@ from .tabs.main_tab import render_main_tab
 from .tabs.sysinfo_tab import render_sysinfo_tab
 from .tabs.camera_tab import render_camera_tab
 from .tabs.config_tab import render_config_tab
+from .tabs.localization_tab import render_localization_tab
 
 
 def render_nav_drawer():
@@ -25,6 +26,9 @@ def render_nav_drawer():
             with ui.item(on_click=lambda: ui.navigate.to('/config')).classes('q-hoverable q-pa-md'):
                 ui.icon('settings')
                 ui.item_section('配置')
+            with ui.item(on_click=lambda: ui.navigate.to('/localization')).classes('q-hoverable q-pa-md'):
+                ui.icon('place')
+                ui.item_section('定位')
             with ui.item(on_click=lambda: ui.navigate.to('/sysinfo')).classes('q-hoverable q-pa-md'):
                 ui.icon('memory')
                 ui.item_section('系统信息')
@@ -56,6 +60,11 @@ def config_page():
 def sysinfo_page():
     render_nav_drawer()
     render_sysinfo_tab()
+
+@ui.page('/localization')
+def localization_page():
+    render_nav_drawer()
+    render_localization_tab()
 
 @ui.page('/about')
 def about_page():

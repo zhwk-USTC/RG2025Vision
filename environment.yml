@@ -1,4 +1,4 @@
-name: RG25
+name: rg25
 channels:
   - conda-forge
   - defaults
@@ -6,6 +6,7 @@ dependencies:
   - python=3.10
   - numpy
   - opencv
+  - scipy
   - pip
   - pip:
       - cv2_enumerate_cameras

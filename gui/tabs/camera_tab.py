@@ -111,11 +111,11 @@ def render_camera_tab():
                     
                     
                     camera_info_widget = ui.textarea('').props('label=摄像头信息 readonly').classes(
-                        'bg-blue-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:150px;min-height:100px;flex:1;')
+                        'bg-blue-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:150px;min-height:200px;flex:1;')
                     camera_info_widgets.append(camera_info_widget)
                     
                     detection_result_widget = ui.textarea('').props('label=检测结果 readonly').classes(
-                        'bg-green-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:150px;min-height:100px;flex:1;')
+                        'bg-green-1 q-pa-sm').style('white-space:pre-line;word-break:break-all;min-width:300px;min-height:200px;flex:1;')
                     detection_result_widgets.append(detection_result_widget)
 
     

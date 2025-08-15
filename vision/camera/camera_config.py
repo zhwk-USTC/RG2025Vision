@@ -95,8 +95,7 @@ def load_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PAT
             cam.tag36h11_enabled = cam_cfg.get('tag36h11_enabled', True)
             
             logger.info(
-                f"摄像头 {i} 配置已加载: {cam.alias} ({cam.info.name if cam.info else '未知'}) ({cam.width}x{cam.height} @ {cam.fps}fps)",
-                notify_gui=False
+                f"摄像头 {i} 配置已加载: {cam.alias} ({cam.info.name if cam.info else '未知'}) ({cam.width}x{cam.height} @ {cam.fps}fps)"
             )
         return True
     except Exception as e:

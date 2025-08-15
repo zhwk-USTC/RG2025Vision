@@ -16,6 +16,7 @@ cameras = [Camera(), Camera(), Camera()]
 # 初始加载配置
 from .camera_config import load_config
 load_config(cameras)
+load_intrinsics(cameras)
 
 __all__ = [
     'Camera',

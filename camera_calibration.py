@@ -274,8 +274,6 @@ def process_image_folder(folder_path, calibrator: CameraCalibrator, output_file=
     print(f"cx={intrinsics.cx:.2f}, cy={intrinsics.cy:.2f}")
     print(f"k1={intrinsics.k1:.6f}, k2={intrinsics.k2:.6f}")
     print(f"p1={intrinsics.p1:.6f}, p2={intrinsics.p2:.6f}, k3={intrinsics.k3:.6f}")
-    print(f"FOV: 水平={np.degrees(intrinsics.fov_horizontal):.1f}°, "
-        f"垂直={np.degrees(intrinsics.fov_vertical):.1f}°")
     print(f"重投影误差: {calibrator.reprojection_error}")
     
     # 保存结果

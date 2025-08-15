@@ -13,8 +13,8 @@ def process_camera(cam: Camera, detector: Tag36h11Detector):
         frame = cam.read_frame()
         result = None
         if cam.tag36h11_enabled and frame is not None:
-            result = detector.detect(frame)
-        
+            result = detector.detect(frame, cam.intrinsics, 1.0)
+
         # 直接更新camera数据
         cam.extra_data['tag36h11_result'] = result
         cam.extra_data['tag36h11_overlay'] = detector.draw_overlay(frame, result)

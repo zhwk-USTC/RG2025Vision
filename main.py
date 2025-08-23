@@ -2,7 +2,7 @@ import threading
 
 from gui.gui_app import launch as gui_launch
 from communicate.uart import run_uart
-from vision.vision_app import run_vision
+from vision.app import run_vision
 from core.logger import logger
 
 def main():

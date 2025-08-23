@@ -9,23 +9,25 @@ import os
 import inspect
 from typing import List, Optional, Dict, Any
 from core.logger import logger
-from .camera import Camera, camera_info_list
-from .intrinsics import CameraIntrinsics
+from .camera import Camera,CameraIntrinsics, camera_info_list, cameras
 
 # 确保配置目录存在
-CONFIG_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '../../.config'))
+CONFIG_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '../.config'))
 os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # 默认配置文件路径
 CAMERA_CONFIG_PATH = os.path.join(CONFIG_DIR, 'camera_config.json')
 CAMERA_INTRINSICS_PATH = os.path.join(CONFIG_DIR, 'camera_intrinsics.json')
 
+CAMERA_POSE_PATH = os.path.join(CONFIG_DIR, 'camera_pose.json')
+APRILTAG_POSE_PATH = os.path.join(CONFIG_DIR, 'apriltag_pose.json')
 
-def save_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PATH) -> bool:
+
+def save_camera_config() -> bool:
     """保存摄像头配置
     
     Args:
-        cameras_list: 要保存配置的摄像头列表
+        cameras: 要保存配置的摄像头列表
         config_path: 配置文件路径，默认使用全局配置路径
         
     Returns:
@@ -33,10 +35,10 @@ def save_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PAT
     """
     try:
         # 确保目录存在
-        os.makedirs(os.path.dirname(os.path.abspath(config_path)), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(CAMERA_CONFIG_PATH)), exist_ok=True)
         
         config = []
-        for cam in cameras_list:
+        for cam in cameras:
             config.append({
                 'alias': cam.alias,
                 'path': cam.info.path if cam.info else None,
@@ -46,39 +48,39 @@ def save_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PAT
                 'tag36h11_enabled': cam.tag36h11_enabled
             })
             
-        with open(config_path, 'w', encoding='utf-8') as f:
+        with open(CAMERA_CONFIG_PATH, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
             
-        abs_path = os.path.abspath(config_path)
+        abs_path = os.path.abspath(CAMERA_CONFIG_PATH)
         logger.info(f"摄像头配置已保存到 {abs_path}")
         return True
     except Exception as e:
         logger.error(f"保存摄像头配置失败: {e}")
         return False
 
-def load_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PATH) -> bool:
+def load_camera_config() -> bool:
     """加载摄像头配置
     
     Args:
-        cameras_list: 要加载配置的摄像头列表
+        cameras: 要加载配置的摄像头列表
         config_path: 配置文件路径，默认使用全局配置路径
         
     Returns:
         bool: 是否成功加载配置
     """
-    if not os.path.exists(config_path):
-        logger.warning(f"摄像头配置文件不存在: {config_path}")
+    if not os.path.exists(CAMERA_CONFIG_PATH):
+        logger.warning(f"摄像头配置文件不存在: {CAMERA_CONFIG_PATH}")
         return False
         
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(CAMERA_CONFIG_PATH, 'r', encoding='utf-8') as f:
             config = json.load(f)
             
         for i, cam_cfg in enumerate(config):
-            if i >= len(cameras_list):
+            if i >= len(cameras):
                 break
                 
-            cam = cameras_list[i]
+            cam = cameras[i]
             
             # 先根据 path 匹配摄像头
             path = cam_cfg.get('path')
@@ -103,7 +105,7 @@ def load_config(cameras_list: List[Camera], config_path: str = CAMERA_CONFIG_PAT
         return False
 
 
-def load_intrinsics(cameras_list: List[Camera], intrinsics_path: str = CAMERA_INTRINSICS_PATH):
+def load_camera_intrinsics():
     """从文件加载相机内参
     
     Args:
@@ -112,16 +114,16 @@ def load_intrinsics(cameras_list: List[Camera], intrinsics_path: str = CAMERA_IN
     Returns:
         CameraIntrinsics: 加载的内参对象，失败则返回None
     """
-    if not os.path.exists(intrinsics_path):
-        logger.warning(f"内参文件不存在: {intrinsics_path}")
+    if not os.path.exists(CAMERA_INTRINSICS_PATH):
+        logger.warning(f"内参文件不存在: {CAMERA_INTRINSICS_PATH}")
         return None
     
     try:
-        with open(intrinsics_path, 'r', encoding='utf-8') as f:
+        with open(CAMERA_INTRINSICS_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         for i, cam_cfg in enumerate(data):
-            if i >= len(cameras_list):
+            if i >= len(cameras):
                 break
             # 获取类的字段名列表
             params = inspect.signature(CameraIntrinsics).parameters
@@ -140,8 +142,14 @@ def load_intrinsics(cameras_list: List[Camera], intrinsics_path: str = CAMERA_IN
                 intrinsics = None
             else:
                 intrinsics = CameraIntrinsics(**filtered_data)
-            cameras_list[i].intrinsics = intrinsics
+            cameras[i].intrinsics = intrinsics
             logger.info(f"摄像头 {i} 内参已加载: {intrinsics}")
     except Exception as e:
         logger.error(f"加载相机内参失败: {e}")
         return None
+
+def load_camera_pose():
+    pass
+
+def load_apriltag_pose():
+    pass

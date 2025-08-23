@@ -229,7 +229,7 @@ def load_config(path: str = APRILTAG_CONFIG_PATH) -> None:
             if isinstance(data, dict) and 'tag36h11' in data:
                 TAG36H11_CONFIG.clear()
                 TAG36H11_CONFIG.update(data['tag36h11'])
-                logger.info(f"已加载AprilTag配置: {TAG36H11_CONFIG}", notify_gui=False)
+                logger.info(f"已加载AprilTag配置: {TAG36H11_CONFIG}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}")
 

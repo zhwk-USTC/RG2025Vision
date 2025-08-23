@@ -1,6 +1,6 @@
 from nicegui import ui
 from vision.camera import cameras, camera_info_list, setup_camera_info
-from vision.camera import save_config as save_camera_config, load_config as load_camera_config
+from vision.config import save_camera_config, load_camera_config
 from vision.apriltag import save_config as save_apriltag_config, apply_config as apply_apriltag_config
 
 from PIL import Image
@@ -122,7 +122,7 @@ def render_camera_config():
             setup_camera_info()
             nonlocal cam_choices; 
             cam_choices = [(c.name, i) for i, c in enumerate(camera_info_list)]
-            load_camera_config(cameras)
+            load_camera_config()
             logger.info("摄像头重新检测完成")
         except Exception as e:
             logger.error(f"摄像头检测失败: {str(e)}")
@@ -223,7 +223,7 @@ def render_camera_config():
                 fps_dropdown.on('update:model-value', on_fps_change)
 
                 def on_save_click(cam=cam):
-                    save_camera_config(cameras)
+                    save_camera_config()
                 save_btn.on('click', lambda e, cam=cam: on_save_click(cam))
 
                 def on_connect_click(cam=cam):

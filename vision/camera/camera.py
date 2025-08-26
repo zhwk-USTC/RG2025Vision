@@ -4,7 +4,7 @@ import platform
 from typing import Optional
 from cv2_enumerate_cameras import enumerate_cameras
 
-from .intrinsics import CameraIntrinsics
+from .params import CameraIntrinsics, CameraPose
 from core.logger import logger
 
 camera_info_list = []
@@ -57,8 +57,10 @@ class Camera:
         self.tag36h11_enabled = True  # 是否启用 tag36h11 检测
         
         # 摄像头内参
-        self.intrinsics: Optional[CameraIntrinsics] = None  # CameraIntrinsics对象
-
+        self.intrinsics: Optional[CameraIntrinsics] = None 
+        # 摄像头外参
+        self.pose: Optional[CameraPose] = None
+        
         self.extra_data = {}
 
     def select_camera(self, camera_index: int):
@@ -183,6 +185,3 @@ class Camera:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         self.latest_frame = rgb_frame.copy()
         return rgb_frame
-
-# CameraIntrinsics 已移至 intrinsics.py
-# 摄像头配置的保存和加载功能已移至 camera_config.py

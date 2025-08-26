@@ -1,82 +1,93 @@
 """
 定位配置界面
-用于配置摄像头位置、场地标签位置等定位参数
 """
 
-from nicegui import ui
+from typing import List, Dict
 import numpy as np
-from vision.localization import Localization, CameraPose, TagPose
+from PIL import Image
+from nicegui import ui
 from core.logger import logger
+from vision import localizer
+# ---------------------------
+# 常量 / 工具
+# ---------------------------
+
+# 占位图
 
 
-def render_localization_tab():
-    """渲染定位配置界面"""
-    
-    ui.markdown('# 定位配置')
+def get_placeholder_img():
+    return Image.open("assets/no_signal.png").convert("RGB")
 
-    # 1. 场地布局可视化（用空白SVG填充）
-    with ui.card().classes('q-pa-md q-mb-md').style('width: 100%'):
-        ui.markdown('## 场地布局可视化')
-        blank_svg = '<svg width="400" height="300" style="border: 1px solid #ccc; background: #f9f9f9;"></svg>'
-        ui.html(blank_svg)
-        ui.label('此处为场地布局预览（空白）').classes('text-caption')
 
-    # 2. 摄像头位置配置
-    with ui.card().classes('q-pa-md q-mb-md').style('width: 100%'):
-        ui.markdown('## 摄像头位置配置')
-        ui.markdown('配置每个摄像头相对于小车中心的位置和角度')
-        camera_configs = []
-        with ui.row().classes('q-gutter-md'):
-            for i in range(3):
-                with ui.column().classes('q-gutter-sm').style('flex: 1'):
-                    ui.label(f'摄像头 {i}').classes('text-h6 text-center')
-                    if i < len(robot_localizer.camera_poses):
-                        pose = robot_localizer.camera_poses[i]
-                        x_val, y_val, yaw_val = pose.x, pose.y, pose.yaw
-                    else:
-                        x_val, y_val, yaw_val = 0.0, 0.0, 0.0
-                    x_input = ui.number('X坐标 (m)', value=x_val, step=0.01, format='%.3f').classes('w-full')
-                    y_input = ui.number('Y坐标 (m)', value=y_val, step=0.01, format='%.3f').classes('w-full')
-                    yaw_input = ui.number('角度 (度)', value=np.degrees(yaw_val), step=1, format='%.1f').classes('w-full')
-                    camera_configs.append({
-                        'x': x_input,
-                        'y': y_input,
-                        'yaw': yaw_input
-                    })
-        def save_camera_config():
-            robot_localizer.camera_poses = []
-            for i, config in enumerate(camera_configs):
-                try:
-                    x = config['x'].value
-                    y = config['y'].value
-                    yaw = np.radians(config['yaw'].value)
-                    robot_localizer.camera_poses.append(CameraPose(x, y, yaw))
-                    logger.info(f"摄像头 {i} 配置: ({x:.3f}, {y:.3f}), 角度: {np.degrees(yaw):.1f}°")
-                except Exception as e:
-                    logger.error(f"摄像头 {i} 配置错误: {e}")
-            robot_localizer.save_config()
-            ui.notify('摄像头配置已保存', type='positive')
-        ui.button('保存摄像头配置', on_click=save_camera_config, color='primary').classes('w-full q-mt-md')
+def _deg(rad: float) -> float:
+    try:
+        return float(np.degrees(rad))
+    except Exception:
+        return 0.0
 
-    # 3. 场地AprilTag配置（仅 x, y, yaw）
-    with ui.card().classes('q-pa-md q-mb-md').style('width: 100%'):
-        ui.markdown('## 场地AprilTag配置')
-        ui.markdown('场地中每个AprilTag的位置（readonly）')
-        with ui.column().classes('q-gutter-sm'):
-            tag_table_data = []
-            for tag_id, tag in robot_localizer.field_tags.items():
-                tag_table_data.append({
-                    'id': tag_id,
-                    'x': f'{tag.x:.3f}',
-                    'y': f'{tag.y:.3f}',
-                    'yaw': f'{np.degrees(tag.yaw):.1f}°'
-                })
-            ui.table(
-                columns=[
-                    {'name': 'id', 'label': 'ID', 'field': 'id'},
-                    {'name': 'x', 'label': 'X (m)', 'field': 'x'},
-                    {'name': 'y', 'label': 'Y (m)', 'field': 'y'},
-                    {'name': 'yaw', 'label': '角度', 'field': 'yaw'},
-                ],
-                rows=tag_table_data
-            ).classes('w-full')
+
+# ---------------------------
+# 组件渲染
+# ---------------------------
+
+def _render_field_map_card() -> None:
+    with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
+        ui.markdown("## 场地布局")
+        # interactive_image：可缩放/拖拽
+        img_widget = ui.interactive_image().classes("w-100").style("max-width: 960px; max-height: 600px;")
+        img_widget.set_source(get_placeholder_img())
+
+
+def _render_camera_pose_card() -> None:
+    with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
+        ui.markdown("## 摄像头位置（只读）")
+        poses = getattr(localizer, "camera_poses", []) or []
+        if not poses:
+            ui.label("未检测到摄像头位姿数据").classes("text-negative")
+            return
+
+        with ui.row().classes("q-gutter-md"):
+            for i, pose in enumerate(poses):
+                with ui.column().classes("q-gutter-sm").style("flex: 1; min-width: 220px"):
+                    ui.label(f"摄像头 {i}").classes("text-h6 text-center")
+                    ui.number("X 坐标 (m)", value=float(pose.x), format="%.3f") \
+                        .classes("w-full").props("readonly")
+                    ui.number("Y 坐标 (m)", value=float(pose.y), format="%.3f") \
+                        .classes("w-full").props("readonly")
+                    ui.number("角度 (rad)", value=_deg(float(pose.yaw)), format="%.1f") \
+                        .classes("w-full").props("readonly")
+
+
+def _render_tag_table_card() -> None:
+    with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
+        ui.markdown("## 场地 AprilTag 配置（只读）")
+        rows: List[Dict] = []
+        field_tags = getattr(localizer, "field_tags", {}) or {}
+        for tag_id, tag in field_tags.items():
+            rows.append({
+                "id": tag_id,
+                "x": f"{float(tag.x):.3f}",
+                "y": f"{float(tag.y):.3f}",
+                "yaw": f"{_deg(float(tag.yaw)):.1f}°",
+            })
+
+        ui.table(
+            columns=[
+                {"name": "id", "label": "ID", "field": "id"},
+                {"name": "x", "label": "X (m)", "field": "x"},
+                {"name": "y", "label": "Y (m)", "field": "y"},
+                {"name": "yaw", "label": "角度 (rad)", "field": "yaw"},
+            ],
+            rows=rows,
+        ).classes("w-full")
+
+
+# ---------------------------
+# 外部入口
+# ---------------------------
+
+def render_localization_tab() -> None:
+    ui.markdown("# 定位配置")
+    _render_field_map_card()
+    _render_camera_pose_card()
+    _render_tag_table_card()

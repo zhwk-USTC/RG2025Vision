@@ -1,6 +1,7 @@
 import time
 import threading
-from .camera import Camera, cameras
+from .camera import Camera
+from . import cameras
 from .apriltag import tag36h11_detectors, Tag36h11Detector
 from core.logger import logger
 

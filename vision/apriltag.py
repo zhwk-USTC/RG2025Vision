@@ -13,7 +13,7 @@ import cv2
 from pyapriltags import Detector, Detection
 
 from core.logger import logger
-from vision.camera.intrinsics import CameraIntrinsics
+from vision.camera.params import CameraIntrinsics
 
 # 默认 tag36h11 配置参数
 TAG36H11_CONFIG = {

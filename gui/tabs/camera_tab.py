@@ -2,7 +2,7 @@ from nicegui import ui
 import numpy as np
 from PIL import Image
 
-from vision.camera import cameras
+from vision import cameras
 from core.logger import logger
 
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass, asdict
 import numpy as np
 
 
-@dataclass
+@dataclass(slots=True)
 class CameraIntrinsics:
     """摄像头内参类
     
@@ -46,3 +46,13 @@ class CameraIntrinsics:
         """获取畸变系数"""
         return np.array([self.k1, self.k2, self.p1, self.p2, self.k3])
     
+@dataclass(slots=True)
+class CameraPose:
+    """摄像头在小车坐标系下的二维外参（x, y, yaw）
+    - x, y: 平移（m）
+    - yaw: 旋转角度（弧度）
+    表示  T_car_cam : car ← cam
+    """
+    x: float
+    y: float
+    yaw: float

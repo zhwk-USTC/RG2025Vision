@@ -34,7 +34,7 @@ def get_sysinfo():
     )
 
 
-def render_sysinfo_tab():
+def render_sysinfo_page():
     sysinfo_label = ui.markdown(get_sysinfo())
 
     def update():

@@ -1,7 +1,7 @@
 from nicegui import ui
 
 
-def render_about_tab():
+def render_about_page():
     ui.markdown('''
 # 关于
 RoboGame 2025 视觉系统

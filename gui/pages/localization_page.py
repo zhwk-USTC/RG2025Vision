@@ -11,14 +11,6 @@ from vision import localizer
 # ---------------------------
 # 常量 / 工具
 # ---------------------------
-
-# 占位图
-
-
-def get_placeholder_img():
-    return Image.open("assets/no_signal.png").convert("RGB")
-
-
 def _deg(rad: float) -> float:
     try:
         return float(np.degrees(rad))
@@ -30,13 +22,16 @@ def _deg(rad: float) -> float:
 # 组件渲染
 # ---------------------------
 
+composed_field_image_widget= []
+
 def _render_field_map_card() -> None:
     with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
-        ui.markdown("## 场地布局")
-        # interactive_image：可缩放/拖拽
-        img_widget = ui.interactive_image().classes("w-100").style("max-width: 960px; max-height: 600px;")
-        img_widget.set_source(get_placeholder_img())
+        ui.markdown("## 场地可视化")
+        composed_field_image_widget.append(ui.interactive_image())
+    ui.label(f'当前位置朝向：{localizer.last_pose}')
 
+def _update_composed_field_image() -> None:
+    composed_field_image_widget[0].set_source(localizer.compose_visible_field())
 
 def _render_camera_pose_card() -> None:
     with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
@@ -86,8 +81,10 @@ def _render_tag_table_card() -> None:
 # 外部入口
 # ---------------------------
 
-def render_localization_tab() -> None:
+def render_localization_page() -> None:
     ui.markdown("# 定位配置")
     _render_field_map_card()
     _render_camera_pose_card()
     _render_tag_table_card()
+    
+    ui.timer(1.0/5, _update_composed_field_image)

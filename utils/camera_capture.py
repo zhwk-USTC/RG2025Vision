@@ -2,7 +2,8 @@ import cv2
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
-from vision.camera import camera_info_list, setup_camera_info
+from cv2_enumerate_cameras import enumerate_cameras
+from cv2_enumerate_cameras.camera_info import CameraInfo
 
 class CameraApp:
     def __init__(self, master):
@@ -15,9 +16,8 @@ class CameraApp:
         self.is_running = False
 
         # 获取摄像头信息
-        setup_camera_info()
-        self.cameras = camera_info_list
-        cam_choices = [f'{cam.name}' for cam in self.cameras]
+        self.cameras = enumerate_cameras()
+        cam_choices = [f'CAM{cam.index}: {cam.name}' for cam in self.cameras]
         cam_indices = [str(cam.index) for cam in self.cameras]
         if not cam_choices:
             cam_choices = ['0']

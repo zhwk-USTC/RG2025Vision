@@ -1,14 +1,8 @@
 import asyncio
-from nicegui import ui
-import numpy as np
-from .tabs.about_tab import render_about_tab
-from .tabs.debug_tab import render_debug_tab
-from .tabs.main_tab import render_main_tab
-from .tabs.sysinfo_tab import render_sysinfo_tab
-from .tabs.camera_tab import render_camera_tab
-from .tabs.config_tab import render_config_tab
-from .tabs.localization_tab import render_localization_tab
-
+from nicegui import ui, app
+from typing import Optional, Callable, Awaitable
+from .pages import *
+from core.logger import logger
 
 def render_nav_drawer():
     with ui.left_drawer().classes('bg-grey-2').style('min-width:120px;max-width:240px;width:auto;'):
@@ -17,9 +11,6 @@ def render_nav_drawer():
             with ui.item(on_click=lambda: ui.navigate.to('/')).classes('q-hoverable q-pa-md'):
                 ui.icon('home')
                 ui.item_section('主页面')
-            with ui.item(on_click=lambda: ui.navigate.to('/camera')).classes('q-hoverable q-pa-md'):
-                ui.icon('photo_camera')
-                ui.item_section('摄像头')
             with ui.item(on_click=lambda: ui.navigate.to('/debug')).classes('q-hoverable q-pa-md'):
                 ui.icon('build')
                 ui.item_section('调试')
@@ -39,39 +30,48 @@ def render_nav_drawer():
 @ui.page('/')
 def main_page():
     render_nav_drawer()
-    render_main_tab()
-
-@ui.page('/camera')
-def camera_page():
-    render_nav_drawer()
-    render_camera_tab()
+    render_main_page()
 
 @ui.page('/debug')
 def debug_page():
     render_nav_drawer()
-    render_debug_tab()
+    render_debug_page()
     
 @ui.page('/config')
 def config_page():
     render_nav_drawer()
-    render_config_tab()
+    render_config_page()
 
 @ui.page('/sysinfo')
 def sysinfo_page():
     render_nav_drawer()
-    render_sysinfo_tab()
+    render_sysinfo_page()
 
 @ui.page('/localization')
 def localization_page():
     render_nav_drawer()
-    render_localization_tab()
+    render_localization_page()
 
 @ui.page('/about')
 def about_page():
     render_nav_drawer()
-    render_about_tab()
+    render_about_page()
 
-def launch():
-    from . import set_ui_running
-    set_ui_running(True)
-    ui.run(host='0.0.0.0', port=8080, show=False)
+def launch(
+    *,
+    host: str = '0.0.0.0',
+    port: int = 8080,
+    show: bool = False,
+    on_startup: Optional[Callable[[], Awaitable[None]]] = None,
+    on_shutdown: Optional[Callable[[], Awaitable[None]]] = None,
+) -> None:
+    # 注册生命周期回调（支持 async 或 sync 函数）
+    if on_startup:
+        app.on_startup(on_startup)
+        logger.info('已注册 on_startup 回调')
+    if on_shutdown:
+        app.on_shutdown(on_shutdown)
+        logger.info('已注册 on_shutdown 回调')
+
+    logger.info(f'启动 NiceGUI (host={host}, port={port}, show={show})')
+    ui.run(host=host, port=port, show=show)

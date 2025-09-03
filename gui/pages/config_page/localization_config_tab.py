@@ -7,7 +7,8 @@ import numpy as np
 from PIL import Image
 from nicegui import ui
 from core.logger import logger
-from vision import localizer
+from vision import get_vision, save_vision_config
+from vision.localization import Localizer
 # ---------------------------
 # 常量 / 工具
 # ---------------------------
@@ -24,16 +25,16 @@ def _deg(rad: float) -> float:
 
 composed_field_image_widget= []
 
-def _render_field_map_card() -> None:
+def _render_field_map_card(localizer: Localizer) -> None:
     with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
         ui.markdown("## 场地可视化")
         composed_field_image_widget.append(ui.interactive_image())
     ui.label(f'当前位置朝向：{localizer.last_pose}')
 
-def _update_composed_field_image() -> None:
+def _update_composed_field_image(localizer: Localizer) -> None:
     composed_field_image_widget[0].set_source(localizer.compose_visible_field())
 
-def _render_camera_pose_card() -> None:
+def _render_camera_pose_card(localizer: Localizer) -> None:
     with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
         ui.markdown("## 摄像头位置（只读）")
         poses = getattr(localizer, "camera_poses", []) or []
@@ -53,7 +54,7 @@ def _render_camera_pose_card() -> None:
                         .classes("w-full").props("readonly")
 
 
-def _render_tag_table_card() -> None:
+def _render_tag_table_card(localizer: Localizer) -> None:
     with ui.card().classes("q-pa-md q-mb-md").style("width: 100%"):
         ui.markdown("## 场地 AprilTag 配置（只读）")
         rows: List[Dict] = []
@@ -77,14 +78,17 @@ def _render_tag_table_card() -> None:
         ).classes("w-full")
 
 
-# ---------------------------
-# 外部入口
-# ---------------------------
+def render_localization_tab() -> None:
+    vs = get_vision()
+    def on_detect_and_compute():
+        vs.update()
+    def on_save_config():
+        save_vision_config()
+    ui.button('检测并计算位置', color='primary', on_click=on_detect_and_compute)
+    ui.button('保存配置', color='secondary', on_click=on_save_config)
 
-def render_localization_page() -> None:
-    ui.markdown("# 定位配置")
-    _render_field_map_card()
-    _render_camera_pose_card()
-    _render_tag_table_card()
-    
-    ui.timer(1.0/5, _update_composed_field_image)
+    # _render_field_map_card(localizer=vs.localizer)
+    # _render_camera_pose_card(localizer=vs.localizer)
+    # _render_tag_table_card(localizer=vs.localizer)
+
+    # ui.timer(1.0/5, _update_composed_field_image, localizer=vs.localizer)

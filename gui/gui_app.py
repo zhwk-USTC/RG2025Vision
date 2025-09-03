@@ -17,9 +17,6 @@ def render_nav_drawer():
             with ui.item(on_click=lambda: ui.navigate.to('/config')).classes('q-hoverable q-pa-md'):
                 ui.icon('settings')
                 ui.item_section('配置')
-            with ui.item(on_click=lambda: ui.navigate.to('/localization')).classes('q-hoverable q-pa-md'):
-                ui.icon('place')
-                ui.item_section('定位')
             with ui.item(on_click=lambda: ui.navigate.to('/sysinfo')).classes('q-hoverable q-pa-md'):
                 ui.icon('memory')
                 ui.item_section('系统信息')
@@ -46,11 +43,6 @@ def config_page():
 def sysinfo_page():
     render_nav_drawer()
     render_sysinfo_page()
-
-@ui.page('/localization')
-def localization_page():
-    render_nav_drawer()
-    render_localization_page()
 
 @ui.page('/about')
 def about_page():

@@ -3,11 +3,17 @@ import numpy as np
 import time
 import platform
 from typing import Optional, Any
+from dataclasses import dataclass
 
-from ..types import CameraConfig
 from .manager import CameraInfo, get_camera_info_list
 from core.logger import logger
 
+@dataclass(slots=True)
+class CameraConfig:
+    index:int = -1
+    width:int = 1920
+    height:int = 1080
+    fps:float = 30.0
 
 class Camera:
     """

@@ -1,7 +1,7 @@
 # vision/__init__.py
 
-from .system import VisionSystem
-from .runtime import is_vision_initialized, init_vision, start_vision, get_vision, reset_vision
+from .vision_system import VisionSystem
+from .runtime import is_vision_initialized, init_vision, start_vision, get_vision, reset_vision, save_vision_config
 
 __all__ = [
     'VisionSystem',
@@ -9,5 +9,6 @@ __all__ = [
     'init_vision',
     'get_vision',
     'start_vision',
-    'reset_vision'
+    'reset_vision',
+    'save_vision_config'
 ]

@@ -6,13 +6,9 @@ VisionSystem 单例管理与启动逻辑。
 
 from typing import Optional
 from threading import Lock
-from .system import VisionSystem
-from .nodes import CameraNode
-from .types import VisionSystemConfig
-from .detection.apriltag import TagDetectionConfig
-from .camera.camera import Camera
+from .vision_system import VisionSystem, VisionSystemConfig
 from core.logger import logger
-from core.config import load_config, VISION_CONFIG_PATH
+from core.config import load_config, VISION_CONFIG_PATH, save_config
 
 # 全局变量：保存单例 VisionSystem
 _vs: Optional[VisionSystem] = None
@@ -45,7 +41,7 @@ def get_vision() -> VisionSystem:
 
 def init_vision(cams: int = CAM_NUM) -> VisionSystem:
     """
-    初始化 VisionSystem 实例，使用默认数量的相机（默认为 CAM_NUM）。
+    初始化 VisionSystem 实例，并加载配置。
     如果实例已经存在，则返回已有实例。
 
     Args:
@@ -103,3 +99,16 @@ def reset_vision() -> None:
     # 在锁外进行销毁与清理操作，避免死锁
     if old is not None:
         old.close()  # 调用 VisionSystem 的关闭方法，释放资源
+
+def save_vision_config() -> None:
+    """
+    保存当前 VisionSystem 的配置到文件。
+    如果实例尚未初始化，则不执行任何操作。
+    """
+    if not is_vision_initialized():
+        logger.error("VisionSystem 未初始化，无法保存配置")
+        return
+    vs = get_vision()
+    config = vs.get_config()
+    save_config(VISION_CONFIG_PATH, config)
+    logger.info("已保存视觉系统配置")

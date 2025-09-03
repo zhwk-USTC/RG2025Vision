@@ -4,8 +4,8 @@ import numpy as np
 from PIL import Image
 from typing import Optional, Union
 
-from vision import get_vision
-from vision.nodes.camera_node import CameraNode
+from vision import get_vision, save_vision_config
+from vision.camera_node import CameraNode
 from core.logger import logger
 
 
@@ -58,14 +58,14 @@ def render_camera_block(cam_node: CameraNode):
             def on_debug_change(value):
                 nonlocal _debug_loop
                 if value:
-                    _debug_loop = ui.timer(1.0 / debug_fps_input.value, cam_node.read_frame_and_detect)
+                    _debug_loop = ui.timer(1.0 / debug_fps_input.value, cam_node.read_frame_and_detect_async)
                     logger.info(f"已启动模拟检测循环，频率 {debug_fps_input.value} FPS")
                 else:
                     if _debug_loop:
                         _debug_loop.cancel()
                         logger.info("已停止模拟检测循环")
             debug_btn = ui.checkbox('模拟检测循环', on_change=lambda e: on_debug_change(e.value))
-            debug_fps_input = ui.number('帧率', value=30, min=1, max=60, step=1)
+            debug_fps_input = ui.number('帧率', value=30, min=1, max=30, step=1)
         with ui.row().classes('q-gutter-sm q-mt-md'):
             ui.label('检测叠加类型:').classes('text-subtitle2')
             overlay_type = 'none'
@@ -111,17 +111,18 @@ def render_camera_block(cam_node: CameraNode):
 
 def render_camera_tab():
     vs = get_vision()
+    def on_save_config():
+        save_vision_config()
     def on_connect_all():
-        for cam in vs._nodes:
-            cam.start()
+        vs.start()
     def on_disconnect_all():
-        for cam in vs._nodes:
-            cam.stop()
+        vs.stop()
     with ui.row().classes('q-gutter-md q-mb-md'):
         ui.button('连接所有摄像头', color='primary', on_click=on_connect_all)
         ui.button('断开所有摄像头', color='negative', on_click=on_disconnect_all)
+        ui.button('保存配置', color='secondary', on_click=on_save_config)
 
-    for cam in vs._nodes:
+    for cam in vs._cam_nodes:
         render_camera_block(cam)
 
     

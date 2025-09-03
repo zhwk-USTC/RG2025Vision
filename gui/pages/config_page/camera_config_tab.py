@@ -3,11 +3,11 @@ import numpy as np
 from typing import Optional
 from PIL import Image
 
-from vision import get_vision
-from vision.camera import get_camera_info_list
-from vision.nodes.camera_node import CameraNode, Tag36h11Detector, TagDetectionConfig
+from vision import get_vision, save_vision_config
+from vision.camera_node.camera import get_camera_info_list
+from vision.camera_node import CameraNode
+from vision.detection.apriltag import TagDetectionConfig, TagDetectionConfig, Tag36h11Detector
 from core.logger import logger
-from core.config import save_config, VISION_CONFIG_PATH
 
 
 def _empty_image():
@@ -18,14 +18,12 @@ def render_camera_config_tab():
     vs = get_vision()
 
     def on_save_config():
-        config = vs.get_config()
-        save_config(VISION_CONFIG_PATH, config)
-        logger.info('相机配置已保存')
+        save_vision_config()
 
     ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
 
     # 默认：可独立展开多个
-    for cam_node in vs._nodes:
+    for cam_node in vs._cam_nodes:
         render_camera_block(cam_node)
 
 
@@ -81,7 +79,7 @@ def render_camera_block(cam_node: CameraNode):
 
     async def on_refresh_image():
         try:
-            frame = await cam_node.read_frame()
+            frame = await cam_node.read_frame_async()
             if frame is not None:
                 img_widget.set_source(Image.fromarray(frame))
                 logger.info(f'摄像头 {cam_node.alias} 图像已刷新')
@@ -159,7 +157,6 @@ def render_camera_block(cam_node: CameraNode):
             tag36h11_config = cam_node._tag36h11_detector.get_config(
             ) if cam_node._tag36h11_detector else None
             if not tag36h11_config:
-                ui.label('AprilTag36h11检测器未配置,使用默认配置').classes('text-red')
                 logger.warning(f'{cam_node.alias} 的 AprilTag36h11 检测器未配置,使用默认配置')
                 tag36h11_config = TagDetectionConfig()
                 tag36h11_config.families = 'tag36h11'
@@ -189,8 +186,18 @@ def render_camera_block(cam_node: CameraNode):
                     checked = bool(int(value))
                     tag36h11_config.refine_edges = checked
                     refine_edges_value.text = f"{int(checked)}"
-                    
-            def on_apply_apriltag_click():
+            
+            def on_use_tag36h11(value):
+                if value:
+                    cam_node.enable_tag36h11 = True
+                    logger.info(f'{cam_node.alias} 的 AprilTag36h11 检测器已创建')
+                    tag36h11_config_box.set_visibility(True)
+                else:
+                    cam_node.enable_tag36h11 = False
+                    logger.info(f'{cam_node.alias} 的 AprilTag36h11 检测器已删除')
+                    tag36h11_config_box.set_visibility(False)
+
+            def on_apply_tag36h11():
                 if( not cam_node._tag36h11_detector):
                     cam_node._tag36h11_detector = Tag36h11Detector(tag36h11_config)
                     logger.info(f'{cam_node.alias} 的 AprilTag36h11 检测器已创建')
@@ -199,61 +206,68 @@ def render_camera_block(cam_node: CameraNode):
                     logger.info(f'{cam_node.alias} 的 AprilTag36h11 检测器配置已更新')
                 logger.info('AprilTag配置已应用')
 
-            ui.label('tag36h11参数').classes('text-h6')
-            # 每行一个参数，label-滑条-数值，并加中文注释说明作用
-            with ui.column().classes('q-gutter-xs'):
-                with ui.row().classes('items-center q-gutter-md'):
-                    # quad_decimate：图像下采样倍数，越大速度越快但精度下降，推荐1.0~2.0
-                    ui.label('quad_decimate').style('min-width:110px')
-                    quad_decimate_input = ui.slider(
-                        value=tag36h11_config.quad_decimate, min=1.0, max=4.0, step=0.1,
-                        on_change=lambda e: on_quad_decimate(e.value)).style(
-                        'min-width:240px;max-width:400px;flex:1')
-                    quad_decimate_value = ui.label(f"{tag36h11_config.quad_decimate}").style(
-                        'min-width:48px;text-align:right')
-                    ui.label('图像下采样倍数，越大速度越快但精度下降').style(
-                        'color:#888;font-size:13px')
-                with ui.row().classes('items-center q-gutter-md'):
-                    # quad_sigma：高斯模糊参数，抑制噪声，0为不模糊
-                    ui.label('quad_sigma').style('min-width:110px')
-                    quad_sigma_input = ui.slider(
-                        value=tag36h11_config.quad_sigma, min=0.0, max=2.0, step=0.1,
-                        on_change=lambda e: on_quad_sigma(e.value)).style(
-                        'min-width:240px;max-width:400px;flex:1')
-                    quad_sigma_value = ui.label(f"{tag36h11_config.quad_sigma}").style(
-                        'min-width:48px;text-align:right')
-                    ui.label('高斯模糊参数，抑制噪声，0为不模糊').style(
-                        'color:#888;font-size:13px')
-                with ui.row().classes('items-center q-gutter-md'):
-                    # decode_sharpening：解码锐化参数，提升边缘清晰度
-                    ui.label('decode_sharpening').style('min-width:110px')
-                    decode_sharpening_input = ui.slider(
-                        value=tag36h11_config.decode_sharpening, min=0.0, max=1.0, step=0.1,
-                        on_change=lambda e: on_decode_sharpening(e.value)
-                        ).style(
-                        'min-width:240px;max-width:400px;flex:1')
-                    decode_sharpening_value = ui.label(f"{tag36h11_config.decode_sharpening}").style(
-                        'min-width:48px;text-align:right')
-                    ui.label('解码锐化参数，提升边缘清晰度').style(
-                        'color:#888;font-size:13px')
-                with ui.row().classes('items-center q-gutter-md'):
-                    # nthreads：线程数，提升检测速度，推荐与CPU核心数一致
-                    ui.label('nthreads').style('min-width:110px')
-                    nthreads_input = ui.slider(
-                        value=tag36h11_config.nthreads, min=1, max=16, step=1,
-                        on_change=lambda e:on_nthreads(e.value)).style(
-                        'min-width:240px;max-width:400px;flex:1')
-                    nthreads_value = ui.label(f"{tag36h11_config.nthreads}").style(
-                        'min-width:48px;text-align:right')
-                    ui.label('线程数，提升检测速度，推荐与CPU核心数一致').style(
-                        'color:#888;font-size:13px')
-                with ui.row().classes('items-center q-gutter-md'):
-                    # refine_edges：是否优化边缘检测，提升精度但略慢
-                    ui.label('refine_edges').style('min-width:110px')
-                    refine_edges_input = ui.slider(value=int(bool(tag36h11_config.refine_edges)), min=0, max=1, step=1).style(
-                        'min-width:240px;max-width:400px;flex:1')
-                    refine_edges_value = ui.label(f"{int(bool(tag36h11_config.refine_edges))}").style(
-                        'min-width:48px;text-align:right')
-                    ui.label('是否优化边缘检测，提升精度但略慢').style('color:#888;font-size:13px')
+            ui.checkbox('启用 Tag36h11 检测器', value=cam_node.enable_tag36h11, on_change=lambda e: on_use_tag36h11(e.value))
+            tag36h11_config_box = ui.card()
+            if cam_node.enable_tag36h11:
+                tag36h11_config_box.set_visibility(True)
+            else:
+                tag36h11_config_box.set_visibility(False)
+            with tag36h11_config_box:
+                ui.label('tag36h11参数').classes('text-h6')
+                # 每行一个参数，label-滑条-数值，并加中文注释说明作用
+                with ui.column().classes('q-gutter-xs'):
+                    with ui.row().classes('items-center q-gutter-md'):
+                        # quad_decimate：图像下采样倍数，越大速度越快但精度下降，推荐1.0~2.0
+                        ui.label('quad_decimate').style('min-width:110px')
+                        quad_decimate_input = ui.slider(
+                            value=tag36h11_config.quad_decimate, min=1.0, max=4.0, step=0.1,
+                            on_change=lambda e: on_quad_decimate(e.value)).style(
+                            'min-width:240px;max-width:400px;flex:1')
+                        quad_decimate_value = ui.label(f"{tag36h11_config.quad_decimate}").style(
+                            'min-width:48px;text-align:right')
+                        ui.label('图像下采样倍数，越大速度越快但精度下降').style(
+                            'color:#888;font-size:13px')
+                    with ui.row().classes('items-center q-gutter-md'):
+                        # quad_sigma：高斯模糊参数，抑制噪声，0为不模糊
+                        ui.label('quad_sigma').style('min-width:110px')
+                        quad_sigma_input = ui.slider(
+                            value=tag36h11_config.quad_sigma, min=0.0, max=2.0, step=0.1,
+                            on_change=lambda e: on_quad_sigma(e.value)).style(
+                            'min-width:240px;max-width:400px;flex:1')
+                        quad_sigma_value = ui.label(f"{tag36h11_config.quad_sigma}").style(
+                            'min-width:48px;text-align:right')
+                        ui.label('高斯模糊参数，抑制噪声，0为不模糊').style(
+                            'color:#888;font-size:13px')
+                    with ui.row().classes('items-center q-gutter-md'):
+                        # decode_sharpening：解码锐化参数，提升边缘清晰度
+                        ui.label('decode_sharpening').style('min-width:110px')
+                        decode_sharpening_input = ui.slider(
+                            value=tag36h11_config.decode_sharpening, min=0.0, max=1.0, step=0.1,
+                            on_change=lambda e: on_decode_sharpening(e.value)
+                            ).style(
+                            'min-width:240px;max-width:400px;flex:1')
+                        decode_sharpening_value = ui.label(f"{tag36h11_config.decode_sharpening}").style(
+                            'min-width:48px;text-align:right')
+                        ui.label('解码锐化参数，提升边缘清晰度').style(
+                            'color:#888;font-size:13px')
+                    with ui.row().classes('items-center q-gutter-md'):
+                        # nthreads：线程数，提升检测速度，推荐与CPU核心数一致
+                        ui.label('nthreads').style('min-width:110px')
+                        nthreads_input = ui.slider(
+                            value=tag36h11_config.nthreads, min=1, max=16, step=1,
+                            on_change=lambda e:on_nthreads(e.value)).style(
+                            'min-width:240px;max-width:400px;flex:1')
+                        nthreads_value = ui.label(f"{tag36h11_config.nthreads}").style(
+                            'min-width:48px;text-align:right')
+                        ui.label('线程数，提升检测速度，推荐与CPU核心数一致').style(
+                            'color:#888;font-size:13px')
+                    with ui.row().classes('items-center q-gutter-md'):
+                        # refine_edges：是否优化边缘检测，提升精度但略慢
+                        ui.label('refine_edges').style('min-width:110px')
+                        refine_edges_input = ui.slider(value=int(bool(tag36h11_config.refine_edges)), min=0, max=1, step=1).style(
+                            'min-width:240px;max-width:400px;flex:1')
+                        refine_edges_value = ui.label(f"{int(bool(tag36h11_config.refine_edges))}").style(
+                            'min-width:48px;text-align:right')
+                        ui.label('是否优化边缘检测，提升精度但略慢').style('color:#888;font-size:13px')
 
-            ui.button('应用配置', on_click=on_apply_apriltag_click, color='primary')
+                ui.button('应用配置', on_click=on_apply_tag36h11, color='primary')

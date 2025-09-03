@@ -6,9 +6,9 @@ AprilTag 多摄像头二维定位模块（融合多相机观测到已知 Tag 地
 - CameraPose, TagPose, CarPose
 - Localizer
 """
-from ..types.tag_types import TagPose, CarPose
-from .localizer import Localizer  # 修正：此前误写为 localization
+from .localizer import Localizer, LocalizerConfig
+from .types import TagPose, CarPose
 
 TAG_SIZE_M: float = 0.15
 
-__all__ = ["TagPose", "CarPose", "Localizer", "TAG_SIZE_M"]
+__all__ = ["TagPose", "CarPose", "Localizer", "LocalizerConfig", "TAG_SIZE_M"]

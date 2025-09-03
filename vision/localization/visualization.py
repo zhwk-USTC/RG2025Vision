@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import math
 from PIL import Image
-from ..types.tag_types import TagPose, CarPose
+from .types import TagPose, CarPose
 
 # ---------- 路径与全局资源 ----------
 ASSETS_DIR = os.path.normpath(os.path.join(

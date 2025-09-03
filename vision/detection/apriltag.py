@@ -1,11 +1,26 @@
 import json
 import os
 from typing import List, Dict, Tuple, Optional, Union
+from dataclasses import dataclass
 import numpy as np
 import cv2
 from pyapriltags import Detector, Detection
 from core.logger import logger
-from ..types import CameraIntrinsics, TagDetection, TagDetections, TagDetectionConfig
+from ..camera_node.types import CameraIntrinsics
+
+TagDetection = Detection
+
+TagDetections = List[TagDetection]
+
+@dataclass(slots=True)
+class TagDetectionConfig:
+    families: str = 'tag36h11'
+    nthreads: int = 1
+    quad_decimate: float = 2.0
+    quad_sigma: float = 0.0
+    refine_edges: int = 1
+    decode_sharpening: float = 0.25
+    debug: int = 0
 
 # 默认配置（支持多个标签种类）
 DEFAULT_CONFIG = {

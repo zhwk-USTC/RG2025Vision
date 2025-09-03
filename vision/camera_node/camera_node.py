@@ -4,13 +4,23 @@ import concurrent.futures as futures
 from typing import Optional
 import numpy as np
 import threading
+from dataclasses import dataclass
 
 from core.logger import logger
-from ..camera import Camera, CameraIntrinsics, CameraPose, CameraConfig
-from ..types import CamNodeConfig, TagDetections, TagDetectionConfig
+from .camera import Camera, CameraConfig
+from ..detection.apriltag import TagDetections, TagDetectionConfig
+from .types import CameraIntrinsics, CameraPose
+from vision.detection.apriltag import Tag36h11Detector
+    
+@dataclass(slots=True)
+class CamNodeConfig:
+    """摄像头节点配置类"""
+    alias: str = "未命名"
+    camera: Optional[CameraConfig] = None
+    intrinsics: Optional[CameraIntrinsics] = None
+    pose: Optional[CameraPose] = None
 
-from ..detection.apriltag import Tag36h11Detector
-
+    tag36h11: Optional[TagDetectionConfig] = None
 
 class CameraNode:
     """
@@ -41,6 +51,7 @@ class CameraNode:
         self.camera_intrinsics: Optional[CameraIntrinsics] = None
         self.camera_pose: Optional[CameraPose] = None
 
+        self.enable_tag36h11: bool = False
         self._tag36h11_detector: Optional[Tag36h11Detector] = Tag36h11Detector(
             config.tag36h11) if config and config.tag36h11 else None
         self._latest_tag36h11_detection: Optional[TagDetections] = None
@@ -86,9 +97,48 @@ class CameraNode:
         self._camera.select_by_index(camera_index)
         logger.info(f"CameraNode[{self.alias}] 选择相机 {self.camera_name}")
 
-    # ---------- 一次性异步检测（核心） ----------
+    # ---------- 一次性检测 ----------
+    def read_frame(self) -> Optional[np.ndarray]:
+        """同步读取一帧"""
+        if not self._camera:
+            raise RuntimeError(f"CameraNode[{self.alias}] 相机未初始化")
+        if not self.is_open:
+            raise RuntimeError(f"CameraNode[{self.alias}] 相机未连接")
+        return self._camera.read_frame()
+    
+    def read_frame_and_detect(self) -> Optional[TagDetections]:
+        """
+        触发一次检测（同步阻塞）。
+        - 同一相机的多次调用会排队（单线程池），多个相机可并发。
+        - 若相机未连接则抛错。
+        - 返回 None 表示：未取到帧或检测器返回异常被捕获。
+        """
+        if self._camera is None:
+            raise RuntimeError(f"CameraNode[{self.alias}] 相机未初始化")
+        if not self.is_open:
+            raise RuntimeError(f"CameraNode[{self.alias}] 相机未连接")
 
-    async def read_frame(self) -> Optional[np.ndarray]:
+        # 拍一帧或取最新帧
+        frame = self.read_frame()
+        self._latest_frame = frame
+
+        self._update_fps()
+
+        if frame is None or self._tag36h11_detector is None:
+            self._latest_tag36h11_detection = None
+            return None
+
+        try:
+            result = self._tag36h11_detector.detect(
+                frame, self.camera_intrinsics, 1.0)
+            self._latest_tag36h11_detection = result
+            return result
+        except Exception as e:
+            logger.warning(f"[CameraNode] {self.alias} 检测异常: {e}")
+            self._latest_tag36h11_detection = None
+            return None
+    
+    async def read_frame_async(self) -> Optional[np.ndarray]:
         if not self._camera:
             raise RuntimeError(f"CameraNode[{self.alias}] 相机未初始化")
         if not self.is_open:
@@ -96,7 +146,7 @@ class CameraNode:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, self._camera.read_frame)
 
-    async def read_frame_and_detect(self) -> Optional[TagDetections]:
+    async def read_frame_and_detect_async(self) -> Optional[TagDetections]:
         """
         触发一次检测（异步，不阻塞事件循环）。
         - 同一相机的多次调用会排队（单线程池），多个相机可并发。
@@ -109,7 +159,7 @@ class CameraNode:
             raise RuntimeError(f"CameraNode[{self.alias}] 相机未连接")
 
         # 拍一帧或取最新帧
-        frame = await self.read_frame()
+        frame = await self.read_frame_async()
         self._latest_frame = frame
 
         self._update_fps()

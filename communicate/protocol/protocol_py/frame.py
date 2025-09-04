@@ -3,7 +3,7 @@
 Frame builder for PC<->MCU serial protocol (build-only)
 Frame: AA | LEN | VER | SEQ | CHK | DATA... | 55
 
-- LEN = 3 + N   (VER + SEQ + CHK + DATA)     # 注意：已移除 TYPE
+- LEN = 3 + N   (VER + SEQ + CHK + DATA)
 - CHK = (LEN + VER + SEQ + sum(DATA bytes)) & 0xFF   # CHK 本身不参与
 """
 

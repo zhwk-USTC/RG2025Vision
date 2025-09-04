@@ -5,14 +5,15 @@ from typing import Optional
 from core.logger import logger
 from gui import launch as gui_launch
 from nicegui import app,background_tasks
-from communicate.uart import run_uart
+from communicate.serial_app import init_serial, start_serial, stop_serial
 from vision.runtime import init_vision, get_vision, reset_vision
 
 async def on_gui_startup():
     vs = init_vision()
-    
+    serial = init_serial()
 async def on_gui_shutdown():
     reset_vision()
+    await stop_serial()
 
 def main():
     """主程序入口"""

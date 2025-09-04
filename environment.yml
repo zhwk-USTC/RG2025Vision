@@ -14,6 +14,6 @@ dependencies:
       - pyserial
       - nicegui
       - asyncio
-      - pyee
+      - pyserial-asyncio
       - psutil
       - Pillow

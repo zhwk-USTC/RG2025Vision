@@ -1,0 +1,6 @@
+# 变量（列表形式）
+variables:
+  - name: test0
+    vtype: U8
+  - name: test1
+    vtype: U16LE

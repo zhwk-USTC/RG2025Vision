@@ -62,7 +62,22 @@ ID_SPACE_MIN = 0x01
 ID_SPACE_MAX = 0xEF  # 含
 # 固定宽度：字节数；BYTES 为 None 表示可变长（由 TLV 的 L 决定）
 VALID_TYPES: Dict[str, Optional[int]] = {
-    "U8": 1, "U16LE": 2, "U32LE": 4, "BOOL": 1, "BYTES": None
+    # ---- 基础与别名（固定 1 字节）----
+    "U8": 1, "I8": 1, "BOOL": 1, "BYTE": 1,
+
+    # ---- 16-bit ----
+    "U16LE": 2, "I16LE": 2, "U16BE": 2, "I16BE": 2,
+    # 宽松别名（默认按 LE 处理，若不想宽松可删除这两项）
+    "U16": 2, "I16": 2,
+
+    # ---- 32-bit ----
+    "U32LE": 4, "I32LE": 4, "U32BE": 4, "I32BE": 4,
+    "F32LE": 4, "F32BE": 4,
+    # 宽松别名（默认按 LE 处理）
+    "U32": 4, "I32": 4, "F32": 4,
+
+    # ---- 可变长（由 TLV 的 L 决定）----
+    "BYTES": None, "STR": None, "STRING": None, "UTF8": None, "ASCII": None,
 }
 
 # -------- FNV-1a 8-bit（稳定且简单）--------

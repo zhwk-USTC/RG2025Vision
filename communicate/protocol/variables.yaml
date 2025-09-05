@@ -1,6 +1,8 @@
 # 变量（列表形式）
 variables:
-  - name: test0
+  - name: test_var_u8
     vtype: U8
-  - name: test1
-    vtype: U16LE
+  - name: test_var_u16
+    vtype: U16
+  - name: test_var_f32
+    vtype: F32

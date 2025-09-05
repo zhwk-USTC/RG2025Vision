@@ -1,6 +1,6 @@
 // data.h
 // 数据层 API（变量代号式 TLV）
-// 依赖：protocol_c/data_defs.h（由生成脚本产出，含 Var IDs、VAR_SIZE_TABLE 等）
+// 依赖：protocol_defs.h（由生成脚本产出，含 Var IDs、VAR_SIZE_TABLE 等）
 #pragma once
 
 #include <stdint.h>
@@ -33,13 +33,19 @@ size_t data_put_u8   (uint8_t *buf, size_t cap, size_t w, uint8_t t, uint8_t  va
 size_t data_put_u16le(uint8_t *buf, size_t cap, size_t w, uint8_t t, uint16_t val);
 size_t data_put_u32le(uint8_t *buf, size_t cap, size_t w, uint8_t t, uint32_t val);
 
+/* 新增：float32 (IEEE754, little-endian) 便捷写入 */
+size_t data_put_f32le(uint8_t *buf, size_t cap, size_t w, uint8_t t, float val);
+
 /* 基于 VAR_SIZE_TABLE 的“变量”写入：
  * 若 t 为固定宽度（VAR_SIZE_TABLE[t] != 0），则要求 l 必须等于该固定字节数；
  * 若 t 为可变长（表值为 0），则只需 0<=l<=255。
  * 成功返回新的写指针；失败返回 (size_t)-1，并可通过 *err 得知原因（可为 NULL）
- * 可能的 *err：DATA_ESIZE / DATA_EBUFSZ
+ * 可能的 *err：DATA_ESIZE / DATA_EBUFSZ / DATA_EINVAL
  */
 size_t data_put_var(uint8_t *buf, size_t cap, size_t w, uint8_t t, const void *v, uint8_t l, int *err);
+
+/* 新增：按变量写入 float32（要求对应变量固定宽度为 4） */
+size_t data_put_var_f32(uint8_t *buf, size_t cap, size_t w, uint8_t t, float val, int *err);
 
 /* DATA 头部与整体编码 */
 int    data_begin (uint8_t msg, uint8_t ver, uint8_t *out_buf, size_t out_cap, size_t *out_w);
@@ -72,6 +78,11 @@ typedef struct {
 int data_kv_encode(uint8_t msg, uint8_t ver,
                    const kv_t *kvs, size_t n_kvs,
                    uint8_t *out_buf, size_t out_cap, size_t *out_len);
+
+/* 新增：解码辅助，把 TLV 的 V/L 还原为 float32（小端）
+ * 若 l != 4 或参数为空则返回 DATA_ESIZE/DATA_EINVAL
+ */
+int data_read_f32le(const uint8_t *v, uint8_t l, float *out_val);
 
 #ifdef __cplusplus
 }

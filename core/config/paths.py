@@ -12,7 +12,9 @@ ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
 
 # 各种文件路径
 VISION_CONFIG_PATH      = os.path.join(CONFIG_DIR, "vision_config.json")
+SERIAL_CONFIG_PATH      = os.path.join(CONFIG_DIR, "serial_config.json")
 APRILTAG_POSE_PATH      = os.path.join(ASSETS_DIR, "apriltag_pose.json")
+
 
 # 确保 .config 存在（assets 是随代码发布的，不自动创建）
 os.makedirs(CONFIG_DIR, exist_ok=True)

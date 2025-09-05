@@ -1,72 +1,19 @@
 // frame.c
-// C implementation for: AA | LEN | VER | SEQ | CHK | DATA... | 55
-// - LEN = 3 + N   (VER + SEQ + CHK + DATA)
-// - CHK = (LEN + VER + SEQ + sum(DATA bytes)) & 0xFF  # CHK 本身不参与
-
-#include <stdint.h>
-#include <stddef.h>
+#include "frame.h"
 #include <string.h>
 
-/* ===== 常量定义 ===== */
-enum {
-    FRAME_HEAD = 0xAA,
-    FRAME_TAIL = 0x55,
-    VERSION    = 0x00,          // 默认协议版本
-    MAX_DATA_LEN = 0xFF - 3     // LEN 为 1 字节，LEN = 3 + N => N 最大 252
-};
+// --------- 内部工具 ---------
+static inline uint8_t u8(uint32_t x) { return (uint8_t)(x & 0xFFu); }
 
-/* ===== 错误码 =====
- * 返回 0 表示成功；负数为错误。
- */
-enum {
-    PCMCU_OK                 = 0,
-    PCMCU_EINVAL             = -1, // 参数非法
-    PCMCU_EDATA_TOO_LONG     = -2, // DATA 过长
-    PCMCU_EBUFSZ             = -3, // 输出缓冲区不足
-    PCMCU_EFRAME_TOO_SHORT   = -4, // 输入帧太短
-    PCMCU_EHEAD_TAIL         = -5, // 帧头/尾错误
-    PCMCU_ELEN_INVALID       = -6, // LEN 无效（<3）
-    PCMCU_ELEN_MISMATCH      = -7, // 长度不匹配
-    PCMCU_ECHECKSUM          = -8  // 校验和错误
-};
-
-/* ===== 小工具 ===== */
-static inline uint8_t u8_clip(int x) { return (uint8_t)(x & 0xFF); }
-
-/* 计算 sum(DATA) */
-static uint32_t sum_bytes(const uint8_t *data, size_t len) {
-    uint32_t s = 0;
-    if (data && len) {
-        for (size_t i = 0; i < len; ++i) s += data[i];
-    }
-    return s;
-}
-
-/* CHK = (LEN + VER + SEQ + sum(DATA)) & 0xFF */
-static uint8_t checksum(uint8_t len_byte, uint8_t ver, uint8_t seq,
-                        const uint8_t *data, size_t data_len)
+static uint8_t checksum_u8(uint8_t len_byte, uint8_t ver, uint8_t seq,
+                           const uint8_t *data, size_t data_len)
 {
-    uint32_t s = (uint32_t)len_byte + (uint32_t)ver + (uint32_t)seq + sum_bytes(data, data_len);
-    return u8_clip((int)s);
+    uint32_t s = (uint32_t)len_byte + (uint32_t)ver + (uint32_t)seq;
+    for (size_t i = 0; i < data_len; ++i) s += data[i];
+    return u8(s);
 }
 
-/* 计算给定 data_len 所需的帧总长度（字节数） */
-static size_t frame_size_for(size_t data_len) {
-    // 总长度 = (VER + SEQ + CHK + DATA) + (HEAD + LEN + TAIL) = (3 + data_len) + 3
-    return data_len + 6u;
-}
-
-/* ===== 构帧 =====
- * 构建一帧：AA LEN VER SEQ CHK DATA... 55
- * 参数：
- *   seq, ver       : 与协议同义
- *   data, data_len : 负载字节序列（可为 NULL 且 data_len=0）
- *   out_buf        : 输出缓冲区
- *   out_buf_size   : 输出缓冲区大小（字节）
- *   out_frame_len  : 实际帧长输出（可为 NULL 则忽略）
- * 返回：
- *   0 成功；负数为错误码
- */
+// --------- 帧编码 ---------
 int pcmcu_build_frame(uint8_t seq,
                       const uint8_t *data, size_t data_len,
                       uint8_t ver,
@@ -74,74 +21,60 @@ int pcmcu_build_frame(uint8_t seq,
                       size_t *out_frame_len)
 {
     if (!out_buf) return PCMCU_EINVAL;
-    if (data_len > MAX_DATA_LEN) return PCMCU_EDATA_TOO_LONG;
+    if (data_len > PCMCU_MAX_DATA_LEN) return PCMCU_EDATA_TOO_LONG;
 
-    const uint8_t length = (uint8_t)(3u + (uint8_t)data_len); // LEN 字段
-    const size_t total = frame_size_for(data_len);
-    if (out_buf_size < total) return PCMCU_EBUFSZ;
+    size_t length  = 3u + data_len;          // LEN = 3 + N
+    size_t tot_len = length + 3u;            // HEAD + LEN段(length) + TAIL
 
-    const uint8_t chk = checksum(length, ver, seq, data, data_len);
+    if (tot_len > out_buf_size) return PCMCU_EBUFSZ;
 
-    // 填充
-    size_t idx = 0;
-    out_buf[idx++] = FRAME_HEAD;
-    out_buf[idx++] = length;
-    out_buf[idx++] = ver;
-    out_buf[idx++] = seq;
-    out_buf[idx++] = chk;
+    uint8_t chk = checksum_u8((uint8_t)length, ver, seq, data, data_len);
 
+    uint8_t *b = out_buf;
+    b[0] = PCMCU_FRAME_HEAD;
+    b[1] = (uint8_t)length;
+    b[2] = ver;
+    b[3] = seq;
+    b[4] = chk;
     if (data_len && data) {
-        memcpy(&out_buf[idx], data, data_len);
-        idx += data_len;
+        memcpy(&b[5], data, data_len);
     }
+    b[tot_len - 1] = PCMCU_FRAME_TAIL;
 
-    out_buf[idx++] = FRAME_TAIL;
-
-    if (out_frame_len) *out_frame_len = idx;
+    if (out_frame_len) *out_frame_len = tot_len;
     return PCMCU_OK;
 }
 
-/* ===== 解析（提取 DATA 字段并校验）=====
- * 从完整帧中解析出 DATA 字段，同时可回传 ver/seq。
- * 参数：
- *   frame, frame_len     : 输入完整帧
- *   out_data             : DATA 输出缓冲区（可为 NULL 表示仅校验不拷贝）
- *   out_data_cap         : out_data 容量
- *   out_data_len         : 实际 DATA 长度输出（可为 NULL 则忽略）
- *   out_ver, out_seq     : 可为 NULL（若不需要）
- * 返回：
- *   0 成功；负数为错误码
- */
+// --------- 完整帧解析（抽 DATA + 校验） ---------
 int pcmcu_parse_frame_data(const uint8_t *frame, size_t frame_len,
                            uint8_t *out_data, size_t out_data_cap, size_t *out_data_len,
                            uint8_t *out_ver, uint8_t *out_seq)
 {
     if (!frame) return PCMCU_EINVAL;
+    if (frame_len < (size_t)PCMCU_MIN_FRAME_TOTAL) return PCMCU_EFRAME_TOO_SHORT;
+    if (frame[0] != (uint8_t)PCMCU_FRAME_HEAD || frame[frame_len-1] != (uint8_t)PCMCU_FRAME_TAIL)
+        return PCMCU_EHEAD_TAIL;
 
-    // 最小帧：LEN=3（无 DATA），总长 = 3 + 3 = 6
-    if (frame_len < 6u) return PCMCU_EFRAME_TOO_SHORT;
-    if (frame[0] != FRAME_HEAD || frame[frame_len - 1] != FRAME_TAIL) return PCMCU_EHEAD_TAIL;
+    uint8_t LEN = frame[1];
+    if (LEN < 3u) return PCMCU_ELEN_INVALID;
 
-    const uint8_t length = frame[1];
-    if (length < 3u) return PCMCU_ELEN_INVALID;
+    size_t expected_total = (size_t)LEN + 3u;
+    if (expected_total != frame_len) return PCMCU_ELEN_MISMATCH;
 
-    const size_t expected = (size_t)length + 3u; // HEAD + LEN + LEN段(length) + TAIL
-    if (frame_len != expected) return PCMCU_ELEN_MISMATCH;
-
-    const uint8_t ver = frame[2];
-    const uint8_t seq = frame[3];
-    const uint8_t chk = frame[4];
+    uint8_t ver = frame[2];
+    uint8_t seq = frame[3];
+    uint8_t chk = frame[4];
 
     const uint8_t *data_ptr = &frame[5];
-    const size_t data_len = (size_t)length - 3u;
+    size_t data_len = (frame_len >= 6) ? (frame_len - 6u) : 0u;
 
-    const uint8_t chk_calc = checksum(length, ver, seq, data_ptr, data_len);
-    if (chk != chk_calc) return PCMCU_ECHECKSUM;
+    uint8_t calc = checksum_u8(LEN, ver, seq, data_ptr, data_len);
+    if (chk != calc) return PCMCU_ECHECKSUM;
 
     if (out_ver) *out_ver = ver;
     if (out_seq) *out_seq = seq;
-
     if (out_data_len) *out_data_len = data_len;
+
     if (out_data) {
         if (out_data_cap < data_len) return PCMCU_EBUFSZ;
         if (data_len) memcpy(out_data, data_ptr, data_len);
@@ -149,23 +82,83 @@ int pcmcu_parse_frame_data(const uint8_t *frame, size_t frame_len,
     return PCMCU_OK;
 }
 
-// /* =====（可选）一个简单示例 =====
-// #include <stdio.h>
-// int main(void) {
-//     uint8_t payload[] = {0x10, 0x20, 0x30};
-//     uint8_t frame[64];
-//     size_t frame_len = 0;
+// --------- 流式解析实现 ---------
+static void left_trim(uint8_t *buf, size_t *plen, size_t n)
+{
+    if (n == 0 || *plen == 0) return;
+    if (n >= *plen) { *plen = 0; return; }
+    memmove(buf, buf + n, *plen - n);
+    *plen -= n;
+}
 
-//     int rc = pcmcu_build_frame(/*seq=*/0x01, payload, sizeof(payload), /*ver=*/VERSION,
-//                                frame, sizeof(frame), &frame_len);
-//     if (rc != PCMCU_OK) { printf("build err=%d\n", rc); return 1; }
+static int resync_to_head(uint8_t *buf, size_t *plen)
+{
+    size_t i = 0, n = *plen;
+    while (i < n && buf[i] != (uint8_t)PCMCU_FRAME_HEAD) i++;
+    if (i > 0) left_trim(buf, plen, i);
+    return (*plen > 0 && buf[0] == (uint8_t)PCMCU_FRAME_HEAD) ? 1 : 0;
+}
 
-//     uint8_t data[16], ver, seq;
-//     size_t data_len = 0;
-//     rc = pcmcu_parse_frame_data(frame, frame_len, data, sizeof(data), &data_len, &ver, &seq);
-//     if (rc != PCMCU_OK) { printf("parse err=%d\n", rc); return 1; }
+int pcmcu_stream_feed(pcmcu_stream_t *fs,
+                      const uint8_t *in, size_t in_len,
+                      pcmcu_on_frame_fn onf, void *user)
+{
+    if (!fs) return PCMCU_EINVAL;
 
-//     printf("ok: ver=%u seq=%u data_len=%zu\n", ver, seq, data_len);
-//     return 0;
-// }
-// */
+    // 1) 追加新数据；若溢出，左侧丢弃（保留最新）：
+    if (in_len) {
+        if (in_len >= sizeof(fs->buf)) {
+            // 仅保留输入尾部的 (max) 字节
+            memcpy(fs->buf, in + (in_len - sizeof(fs->buf)), sizeof(fs->buf));
+            fs->len = sizeof(fs->buf);
+        } else {
+            size_t needed = fs->len + in_len;
+            if (needed > sizeof(fs->buf)) {
+                size_t drop = needed - sizeof(fs->buf);
+                left_trim(fs->buf, &fs->len, drop);
+            }
+            memcpy(fs->buf + fs->len, in, in_len);
+            fs->len += in_len;
+        }
+    }
+
+    // 2) 循环提取完整帧
+    for (;;) {
+        if (fs->len < 1) return PCMCU_OK;
+
+        if (fs->buf[0] != (uint8_t)PCMCU_FRAME_HEAD) {
+            if (!resync_to_head(fs->buf, &fs->len)) return PCMCU_OK;
+        }
+        if (fs->len < 2) return PCMCU_OK;
+
+        uint8_t LEN = fs->buf[1];
+        if (LEN < 3u) {
+            left_trim(fs->buf, &fs->len, 1);
+            continue;
+        }
+
+        size_t total = (size_t)LEN + 3u;
+        if (total < (size_t)PCMCU_MIN_FRAME_TOTAL || total > (size_t)PCMCU_MAX_FRAME_TOTAL) {
+            left_trim(fs->buf, &fs->len, 1);
+            continue;
+        }
+
+        if (fs->len < total) return PCMCU_OK;
+
+        if (fs->buf[total - 1] != (uint8_t)PCMCU_FRAME_TAIL) {
+            left_trim(fs->buf, &fs->len, 1);
+            continue;
+        }
+
+        // 至少是“结构完整”的一帧；此处先交给回调/上层
+        // 上层若需要校验/抽DATA，可调用 pcmcu_parse_frame_data
+        int rc = 0;
+        if (onf) rc = onf(fs->buf, total, user);
+
+        // 弹出这帧
+        left_trim(fs->buf, &fs->len, total);
+
+        if (rc != 0) return rc;  // 上层要求中止
+    }
+    // not reachable
+}

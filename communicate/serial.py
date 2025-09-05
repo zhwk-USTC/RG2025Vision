@@ -2,6 +2,13 @@ import asyncio
 import serial_asyncio
 import contextlib
 from typing import Optional, Callable, Union
+from dataclasses import dataclass
+
+@dataclass
+class SerialConfig:
+    port: str = ''
+    baudrate: int = 115200
+    chunk_size: int = 256
 
 
 class AsyncSerial:
@@ -10,10 +17,10 @@ class AsyncSerial:
     - 回调类型: Callable[[bytes], None]，每次回调一块原始 bytes
     - send 仅接受 bytes / bytearray / memoryview
     """
-    def __init__(self, port: str = "", baudrate: int = 115200, chunk_size: int = 256):
-        self.port = port
-        self.baudrate = baudrate
-        self.chunk_size = max(1, int(chunk_size))
+    def __init__(self, config: SerialConfig = SerialConfig()):
+        self.port = config.port
+        self.baudrate = config.baudrate
+        self.chunk_size = max(1, int(config.chunk_size))
 
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
@@ -89,3 +96,11 @@ class AsyncSerial:
         except Exception:
             # 轻量容错：不向外抛，避免杀掉事件循环
             await asyncio.sleep(0.05)
+    
+    
+    def get_config(self) -> SerialConfig:
+        return SerialConfig(
+            port=self.port,
+            baudrate=self.baudrate,
+            chunk_size=self.chunk_size
+        )

@@ -1,6 +1,6 @@
 // data.c
 // 数据层编码与解析：DATA = MSG(1B) | VER(1B) | TLV...，TLV = T(1B) | L(1B) | V(L bytes)
-// 变量代号式 TLV（T=变量 ID）。固定/可变长度由 protocol_c/data_defs.h 的 VAR_SIZE_TABLE 指示。
+// 变量代号式 TLV（T=变量 ID）。固定/可变长度由 protocol_c/protocol_defs.h 的 VAR_SIZE_TABLE 指示。
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -18,6 +18,22 @@ static inline void u32_le_store(uint8_t *p, uint32_t v) {
     p[1] = (uint8_t)((v >> 8)  & 0xFF);
     p[2] = (uint8_t)((v >> 16) & 0xFF);
     p[3] = (uint8_t)((v >> 24) & 0xFF);
+}
+
+/* float32: 避免严格别名问题，用 memcpy 做类型转换 */
+static inline void f32_le_store(uint8_t *p, float f) {
+    uint32_t u;
+    memcpy(&u, &f, 4);
+    u32_le_store(p, u);
+}
+static inline float f32_le_load(const uint8_t *p) {
+    uint32_t u = (uint32_t)p[0]
+               | ((uint32_t)p[1] << 8)
+               | ((uint32_t)p[2] << 16)
+               | ((uint32_t)p[3] << 24);
+    float f;
+    memcpy(&f, &u, 4);
+    return f;
 }
 
 /* ================= TLV 追加函数 ================= */
@@ -63,6 +79,17 @@ size_t data_put_u32le(uint8_t *buf, size_t cap, size_t w, uint8_t t, uint32_t va
     return w;
 }
 
+size_t data_put_f32le(uint8_t *buf, size_t cap, size_t w, uint8_t t, float val)
+{
+    if (!buf) return (size_t)-1;
+    if (w + 2u + 4u > cap) return (size_t)-1;
+    buf[w++] = t;
+    buf[w++] = 4u;
+    f32_le_store(&buf[w], val);
+    w += 4u;
+    return w;
+}
+
 /* 按 VAR_SIZE_TABLE 约束追加变量 */
 size_t data_put_var(uint8_t *buf, size_t cap, size_t w, uint8_t t, const void *v, uint8_t l, int *err)
 {
@@ -77,6 +104,26 @@ size_t data_put_var(uint8_t *buf, size_t cap, size_t w, uint8_t t, const void *v
     size_t nw = data_put_tlv(buf, cap, w, t, v, l);
     if (nw == (size_t)-1) { if (err) *err = DATA_EBUFSZ; }
     return nw;
+}
+
+/* 便捷：按变量写入 float32（要求变量固定宽度为 4） */
+size_t data_put_var_f32(uint8_t *buf, size_t cap, size_t w, uint8_t t, float val, int *err)
+{
+    if (err) *err = DATA_OK;
+    if (!buf) { if (err) *err = DATA_EINVAL; return (size_t)-1; }
+
+    uint8_t expect = VAR_SIZE_TABLE[t];
+    if (expect != 4) {             // 既处理 0(可变长) 也处理非 4 的固定长
+        if (err) *err = DATA_ESIZE;
+        return (size_t)-1;
+    }
+    if (w + 2u + 4u > cap) { if (err) *err = DATA_EBUFSZ; return (size_t)-1; }
+
+    buf[w++] = t;
+    buf[w++] = 4u;
+    f32_le_store(&buf[w], val);
+    w += 4u;
+    return w;
 }
 
 /* ================= DATA 编码/解码 ================= */
@@ -183,5 +230,15 @@ int data_kv_encode(uint8_t msg, uint8_t ver,
     }
 
     if (out_len) *out_len = data_end(w);
+    return DATA_OK;
+}
+
+/* ================= 解码辅助：读取 float32 ================= */
+
+int data_read_f32le(const uint8_t *v, uint8_t l, float *out_val)
+{
+    if (!out_val || (!v && l != 0)) return DATA_EINVAL;
+    if (l != 4) return DATA_ESIZE;
+    *out_val = f32_le_load(v);
     return DATA_OK;
 }

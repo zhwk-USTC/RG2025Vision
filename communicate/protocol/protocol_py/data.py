@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, List, Tuple, Union, Any, Optional
 import struct
 
-from .protocol_defs import Msg, Var, VAR_FIXED_SIZE, PROTOCOL_DATA_VER
+from .protocol_defs import Msg, Var, VAR_FIXED_SIZE, PROTOCOL_DATA_VER, VAR_META
 
 BytesLike = Union[bytes, bytearray, memoryview]
 VarId = Union[Var, int]
@@ -153,18 +153,22 @@ class DataEncoder:
     def encode_kv(self, kv: Dict[VarId, Union[int, bool, float, BytesLike]],
                   *, msg: Union[Msg, int] | None = None, ver: int | None = None) -> bytes:
         tlv_bytes = bytearray()
+
         for t, value in kv.items():
             t_id = int(t) if isinstance(t, Var) else int(t)
-            size: Optional[int] = VAR_FIXED_SIZE.get(t_id)
+
+            meta = VAR_META.get(t_id)
+            size = VAR_FIXED_SIZE.get(t_id)
+
             if size is None:
-                # 可变长：必须给 bytes-like
-                if isinstance(value, (bytes, bytearray, memoryview)):
-                    vbytes = _as_bytes(value)
-                else:
+                # 变长：必须 bytes-like
+                if not isinstance(value, (bytes, bytearray, memoryview)):
                     raise TypeError(f"variable 0x{t_id:02X} is variable-length; please provide bytes")
+                vbytes = _as_bytes(value)
             else:
-                # 固定宽度：支持 int/bool/float32/bytes（bytes 长度需匹配）
+                # 固定宽度：按 size 打包（保留你现有的小端+float32策略）
                 vbytes = _pack_value_for_size(value, size)
+
             tlv_bytes.extend(TLVEncoder.encode_tlv(t_id, vbytes))
 
         # 拼接 MSG|VER|TLVs
@@ -190,7 +194,7 @@ class DataDecoder:
         return DataPacket(msg=msg, ver=ver, tlvs=tlvs)
 
     @staticmethod
-    def value_of(t: VarId, v: BytesLike, *, as_float: bool = False) -> Union[int, float, bytes]:
+    def value_of(t: VarId, v: BytesLike) -> Union[int, float, bytes]:
         """
         将 TLV 的 V 还原为 Python 值：
           - 变量为可变长：返回 bytes
@@ -200,15 +204,19 @@ class DataDecoder:
         """
         t_id = int(t) if isinstance(t, Var) else int(t)
         b = _as_bytes(v)
+        
+        meta = VAR_META.get(t_id)
         size = VAR_FIXED_SIZE.get(t_id)
-        if size is None:
+        if size is None or meta is None:
             return b
         if len(b) != size:
             raise ValueError(f"expect {size} bytes for var 0x{t_id:02X}, got {len(b)}")
-        if as_float:
-            if size != 4:
-                raise TypeError(f"variable 0x{t_id:02X} is not 4 bytes; cannot decode as float32")
+
+        vtype = (meta.get("vtype") or "").upper()
+        # 这里保留小端默认
+        if vtype in ("F32", "F32LE"):
             return _as_float32_le(b)
+        # 其它按无符号小端整型还原（如需区分有符号/BE，可再细分）
         return _unpack_fixed_le_int(b)
 
     @staticmethod
@@ -238,8 +246,8 @@ class DataCodec:
     def decode(self, data: BytesLike) -> DataPacket:
         return self.dec.decode(data)
 
-    def value_of(self, t: VarId, v: BytesLike, *, as_float: bool = False) -> Union[int, float, bytes]:
-        return self.dec.value_of(t, v, as_float=as_float)
+    def value_of(self, t: VarId, v: BytesLike) -> Union[int, float, bytes]:
+        return self.dec.value_of(t, v)
 
     def value_as_float32(self, v: BytesLike) -> float:
         return self.dec.value_as_float32(v)

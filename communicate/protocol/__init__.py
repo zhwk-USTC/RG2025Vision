@@ -8,5 +8,6 @@ __all__ = [
     "FrameDecoder",
     "FrameCodec",
     "Msg",
-    "Var"
+    "Var",
+    "VAR_META",
 ]

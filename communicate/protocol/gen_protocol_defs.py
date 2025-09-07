@@ -12,6 +12,7 @@
     PROTOCOL_DATA_VER     : int = (PROTOCOL_DATA_VER_FULL & 0xFF)
     Msg(IntEnum)          : PC_TO_MCU, MCU_TO_PC
     Var(IntEnum)          : 变量名 -> 稳定 ID（0x01..0xEF）
+    VAR_META              : { vid: {"key": <yaml-name>, "vtype": <str>, "size": <int|None>} }
     VAR_FIXED_SIZE        : {int(Var.*): 固定字节数}（BYTES 不进入此表）
 
 - protocol_c/data_defs.h
@@ -26,14 +27,14 @@
 YAML 输入（二选一）:
 1) 列表：
     variables:
-      - name: SPEED
+      - name: test_var_u8
         vtype: U8
-      - name: DISTANCE
+      - name: test_var_u16
         vtype: U16LE
 2) 字典：
     variables_map:
-      SPEED: U8
-      DISTANCE: U16LE
+      test_var_u8: U8
+      test_var_u16: U16LE
 """
 
 from __future__ import annotations
@@ -117,36 +118,45 @@ def assign_ids(names: List[str]) -> Dict[str, int]:
         out[name] = found
     return out
 
-def load_variables() -> List[Tuple[str, str]]:
+def load_variables() -> List[Tuple[str, str, str]]:
+    """
+    返回: List[(enum_name, vtype, key_name)]
+    - enum_name: 大写（作为 Var 的枚举名）
+    - key_name : YAML 内原始变量名（建议下划线小写），用于 UI 显示和业务键
+    - vtype    : 规范化大写类型字符串
+    """
     if not SPEC.exists():
         raise FileNotFoundError(f"spec file not found: {SPEC}")
 
     doc = yaml.safe_load(SPEC.read_text(encoding="utf-8")) or {}
 
-    vars_list: List[Tuple[str, str]] = []
+    items: List[Tuple[str, str, str]] = []
     if "variables" in doc and doc["variables"]:
         for item in doc["variables"]:
-            name = str(item["name"]).strip().upper()
+            key = str(item["name"]).strip()
+            enum_name = key.strip().upper()
             vtype = str(item["vtype"]).strip().upper()
-            vars_list.append((name, vtype))
+            items.append((enum_name, vtype, key))
     if "variables_map" in doc and doc["variables_map"]:
-        for name, vtype in doc["variables_map"].items():
-            vars_list.append((str(name).strip().upper(), str(vtype).strip().upper()))
+        for key, vtype in doc["variables_map"].items():
+            key = str(key).strip()
+            enum_name = key.upper()
+            items.append((enum_name, str(vtype).strip().upper(), key))
 
-    if not vars_list:
+    if not items:
         raise ValueError("no variables found; fill `variables` or `variables_map` in YAML")
 
-    # 去重 + 类型校验
+    # 去重 + 类型校验（按 enum_name 去重）
     seen = set()
-    cleaned: List[Tuple[str, str]] = []
-    for name, vtype in vars_list:
-        if name in seen:
-            raise ValueError(f"duplicated variable name: {name}")
+    cleaned: List[Tuple[str, str, str]] = []
+    for enum_name, vtype, key in items:
+        if enum_name in seen:
+            raise ValueError(f"duplicated variable name: {enum_name}")
         if vtype not in VALID_TYPES:
-            raise ValueError(f"unknown vtype '{vtype}' for variable {name}. "
+            raise ValueError(f"unknown vtype '{vtype}' for variable {enum_name}. "
                              f"Valid: {sorted(VALID_TYPES.keys())}")
-        seen.add(name)
-        cleaned.append((name, vtype))
+        seen.add(enum_name)
+        cleaned.append((enum_name, vtype, key))
     return cleaned
 
 def build_time_versions() -> tuple[int, int]:
@@ -161,16 +171,24 @@ def build_time_versions() -> tuple[int, int]:
     return full, short
 
 # ---------- Python 输出 ----------
-def gen_protocol_defs_py(vars_nv: List[Tuple[str, str]]) -> str:
-    names = [n for n, _ in vars_nv]
+def gen_protocol_defs_py(vars_list: List[Tuple[str, str, str]]) -> str:
+    # vars_list: (ENUM_NAME, VTYPE, KEY_NAME)
+    names = [enum_name for enum_name, _, _ in vars_list]
     id_map = assign_ids(names)
 
     # 固定宽度表
     fixed_items = []
-    for name, vtype in vars_nv:
+    for enum_name, vtype, _ in vars_list:
         size = VALID_TYPES[vtype]
         if size is not None:
-            fixed_items.append((name, id_map[name], size))
+            fixed_items.append((enum_name, id_map[enum_name], size))
+
+    # VAR_META：vid -> {"key": key_name, "vtype": vtype, "size": size or None}
+    meta_items = []
+    for enum_name, vtype, key_name in vars_list:
+        vid = id_map[enum_name]
+        size = VALID_TYPES[vtype]
+        meta_items.append((enum_name, vid, key_name, vtype, size))
 
     full_ver, short_ver = build_time_versions()
 
@@ -182,7 +200,7 @@ def gen_protocol_defs_py(vars_nv: List[Tuple[str, str]]) -> str:
     lines.append("#   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header")
     lines.append("")
     lines.append("from enum import IntEnum")
-    lines.append("from typing import Dict")
+    lines.append("from typing import Dict, Optional, TypedDict")
     lines.append("")
     lines.append(f"PROTOCOL_DATA_VER_FULL: int = {full_ver}")
     lines.append(f"PROTOCOL_DATA_VER: int = 0x{short_ver:02X}")
@@ -193,26 +211,41 @@ def gen_protocol_defs_py(vars_nv: List[Tuple[str, str]]) -> str:
     lines.append("")
     lines.append("class Var(IntEnum):")
     # 以 ID 顺序输出，便于 MCU 查表/阅读
-    for name, vtype in sorted(vars_nv, key=lambda x: id_map[x[0]]):
-        vid = id_map[name]
-        lines.append(f"    {name} = 0x{vid:02X}  # {vtype}")
+    for enum_name, _, _ in sorted(vars_list, key=lambda x: id_map[x[0]]):
+        vid = id_map[enum_name]
+        vtype = next(v for n, v, _ in vars_list if n == enum_name)
+        lines.append(f"    {enum_name} = 0x{vid:02X}  # {vtype}")
     lines.append("")
-    lines.append("VAR_FIXED_SIZE: Dict[int, int] = {")
-    for name, vid, size in sorted(fixed_items, key=lambda x: x[1]):
-        lines.append(f"    int(Var.{name}): {size},")
+    lines.append("class VarMeta(TypedDict, total=False):")
+    lines.append("    key: str       # 原始键（YAML 中的 name，用于 UI/业务）")
+    lines.append("    vtype: str     # 变量类型字符串（如 U16LE/F32/…）")
+    lines.append("    size: Optional[int]  # 固定长度；可变长(BYTES/STR/…)为 None")
+    lines.append("")
+    lines.append("VAR_META: Dict[int, VarMeta] = {")
+    for enum_name, vid, key_name, vtype, size in sorted(meta_items, key=lambda x: x[1]):
+        key_s = key_name.replace('\\', '\\\\').replace('"', '\\"')
+        lines.append(f'    int(Var.{enum_name}): {{"key": "{key_s}", "vtype": "{vtype}", "size": {repr(size)}}},')
     lines.append("}")
     lines.append("")
-    lines.append("# BYTES 类型未在 VAR_FIXED_SIZE 中声明，按 TLV 的 L 作为长度处理。")
+    lines.append("VAR_FIXED_SIZE: Dict[int, int] = {")
+    for enum_name, vid, size in sorted(fixed_items, key=lambda x: x[1]):
+        lines.append(f"    int(Var.{enum_name}): {size},")
+    lines.append("}")
+    lines.append("")
+    lines.append("# 说明：")
+    lines.append("# - BYTES/STR 等可变长类型不在 VAR_FIXED_SIZE 中；按 TLV 的 L 解析。")
+    lines.append("# - 编解码逻辑由其他模块实现；此文件仅提供 ID/类型/长度元信息。")
     return "\n".join(lines) + "\n"
 
 # ---------- C 输出 ----------
-def gen_c_header(vars_nv: List[Tuple[str, str]]) -> str:
-    names = [n for n, _ in vars_nv]
+def gen_c_header(vars_list: List[Tuple[str, str, str]]) -> str:
+    # vars_list: (ENUM_NAME, VTYPE, KEY_NAME)
+    names = [enum_name for enum_name, _, _ in vars_list]
     id_map = assign_ids(names)
     full_ver, short_ver = build_time_versions()
 
     # 固定宽度
-    fixed = {name: VALID_TYPES[vtype] for name, vtype in vars_nv if VALID_TYPES[vtype] is not None}
+    fixed = {enum_name: VALID_TYPES[vtype] for enum_name, vtype, _ in vars_list if VALID_TYPES[vtype] is not None}
 
     lines: List[str] = []
     lines.append("// Auto-generated. DO NOT EDIT MANUALLY.")
@@ -220,7 +253,7 @@ def gen_c_header(vars_nv: List[Tuple[str, str]]) -> str:
     lines.append("#pragma once")
     lines.append("#include <stdint.h>")
     lines.append("")
-    lines.append(f"#define PROTOCOL_DATA_VER_FULL  {full_ver}")
+    lines.append(f"#define PROTOCOL_DATA_VER_FULL  {full_ver}ULL")
     lines.append(f"#define PROTOCOL_DATA_VER       0x{(full_ver & 0xFF):02X}")
     lines.append("")
     lines.append("// MSG roles")
@@ -228,39 +261,33 @@ def gen_c_header(vars_nv: List[Tuple[str, str]]) -> str:
     lines.append("#define MSG_MCU_TO_PC 0x02")
     lines.append("")
     lines.append("// Variable IDs (T in TLV)")
-    for name, _ in sorted(vars_nv, key=lambda x: id_map[x[0]]):
-        lines.append(f"#define VAR_{name} 0x{id_map[name]:02X}")
+    for enum_name, _, _ in sorted(vars_list, key=lambda x: id_map[x[0]]):
+        lines.append(f"#define VAR_{enum_name} 0x{id_map[enum_name]:02X}")
     lines.append("")
     lines.append("// Fixed sizes (only for fixed-width variables); others are variable-length per TLV L")
-    for name, size in sorted(fixed.items(), key=lambda x: id_map[x[0]]):
-        lines.append(f"#define VAR_{name}_SIZE {size}")
+    for enum_name, size in sorted(fixed.items(), key=lambda x: id_map[x[0]]):
+        lines.append(f"#define VAR_{enum_name}_SIZE {size}")
     lines.append("")
-    # 生成一个 256 项的查表（未声明者为 0）
-    table = ["0"] * 256
-    for name, size in fixed.items():
-        vid = id_map[name]
-        table[vid] = str(size)
-    # 使用指定初始值形式（C99 设计化初始化），也可选择全量展开
+    # 生成 256 项尺寸查表（未声明者为 0）
     lines.append("static const uint8_t VAR_SIZE_TABLE[256] = {")
-    # 尽量简洁输出：使用设计化初始化，避免全 256 个数字一长串
-    # 兼容性考虑：有些老编译器不支持 [index]=，如需最大兼容可改为全量展开。
-    for name, size in sorted(fixed.items(), key=lambda x: id_map[x[0]]):
-        lines.append(f"    [VAR_{name}] = {size},")
+    for enum_name, size in sorted(fixed.items(), key=lambda x: id_map[x[0]]):
+        lines.append(f"    [VAR_{enum_name}] = {size},")
     lines.append("    // others default to 0 (variable-length)")
     lines.append("};")
     lines.append("")
     return "\n".join(lines) + "\n"
 
 def main():
-    vars_nv = load_variables()
+    vars_list = load_variables()  # List[(ENUM_NAME, VTYPE, KEY_NAME)]
 
     # Python
-    PY_OUT.write_text(gen_protocol_defs_py(vars_nv), encoding="utf-8")
+    PY_DIR.mkdir(parents=True, exist_ok=True)
+    PY_OUT.write_text(gen_protocol_defs_py(vars_list), encoding="utf-8")
     print(f"wrote {PY_OUT}")
 
     # C
     C_DIR.mkdir(parents=True, exist_ok=True)
-    C_OUT.write_text(gen_c_header(vars_nv), encoding="utf-8")
+    C_OUT.write_text(gen_c_header(vars_list), encoding="utf-8")
     print(f"wrote {C_OUT}")
 
 if __name__ == "__main__":

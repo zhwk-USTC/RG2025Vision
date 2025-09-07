@@ -1,6 +1,6 @@
 from .data import DataEncoder, DataDecoder, DataCodec
 from .frame import FrameEncoder, FrameDecoder, FrameCodec
-from .protocol_defs import Msg, Var
+from .protocol_defs import Msg, Var, VAR_META
 
 __all__ = [
     "DataEncoder",
@@ -10,5 +10,6 @@ __all__ = [
     "FrameDecoder",
     "FrameCodec",
     "Msg",
-    "Var"
+    "Var",
+    "VAR_META",
 ]

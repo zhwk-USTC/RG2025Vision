@@ -56,6 +56,8 @@ def init_serial(port: Optional[str] = None) -> AsyncSerial:
         config = SerialConfig()
     if port is not None:
         config.port = port
+    if config.port not in [p.device for p in _ports]:
+        logger.warning(f"[Serial] 你指定的串口 {config.port} 不可用")
 
     global _serial
     _serial = AsyncSerial(config)

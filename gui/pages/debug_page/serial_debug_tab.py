@@ -166,6 +166,12 @@ def render_serial_tab() -> None:
     ports = ports_list()
     port_options = {port.device: str(port) for port in ports}
 
+
+    # 获取当前配置的端口，如果不在选项中则设为None
+    current_port = get_serial().port
+    if current_port not in port_options:
+        current_port = None
+        
     with ui.row():
         ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
         ui.button('扫描串口', color='primary', on_click=lambda e: scan_serial_ports())
@@ -173,7 +179,7 @@ def render_serial_tab() -> None:
     with ui.row():
         ui.select(
             options=port_options,
-            value=get_serial().port,
+            value=current_port,
             label='端口',
             on_change=lambda e: on_select_serial(e.value),
         ).classes('w-64')

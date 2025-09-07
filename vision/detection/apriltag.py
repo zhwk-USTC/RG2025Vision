@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 from pyapriltags import Detector, Detection
 from core.logger import logger
-from ..camera_node.types import CameraIntrinsics
+from .types import CameraIntrinsics
 
 TagDetection = Detection
 
@@ -53,30 +53,42 @@ class AprilTagDetectorBase:
             decode_sharpening=config.decode_sharpening,
         )
 
-    def detect(self, image: np.ndarray, camera_intrinsics: Optional[CameraIntrinsics] = None, tag_size: Optional[float] = None) -> Optional[TagDetections]:
+    def detect(self, image: np.ndarray, intrinsics: Optional[CameraIntrinsics] = None, tag_size: Optional[float] = None) -> Optional[TagDetections]:
         """进行 AprilTag 检测，并返回结果"""
         if image.ndim == 3:
             image = np.mean(image, axis=2).astype(np.uint8)
         estimated_pose = False
         camera_params = None
-        if camera_intrinsics and tag_size:
+        if intrinsics and tag_size:
             estimated_pose = True
-            camera_params = (camera_intrinsics.fx, camera_intrinsics.fy,
-                             camera_intrinsics.cx, camera_intrinsics.cy)
+            camera_params = (intrinsics.fx, intrinsics.fy,
+                             intrinsics.cx, intrinsics.cy)
         result = self.detector.detect(
             image, estimate_tag_pose=estimated_pose, camera_params=camera_params, tag_size=tag_size)
         return result
 
     @staticmethod
-    def draw_overlay(img: Union[np.ndarray, object], detect_result: Optional[List[Detection]]) -> Optional[object]:
+    def draw_overlay(img: Optional[np.ndarray], detect_result: Optional[List[Detection]]) -> Optional[np.ndarray]:
         """在图像上绘制检测结果"""
-        if detect_result is None:
+        if detect_result is None or img is None:
             return None
         if hasattr(img, 'mode'):
             img_np = np.array(img)
         else:
             img_np = np.asarray(img)
         overlay = img_np.copy()
+        
+        # 根据图像尺寸动态调整绘制参数
+        img_height, img_width = overlay.shape[:2]
+        img_diagonal = np.sqrt(img_width**2 + img_height**2)
+        
+        # 动态计算线条粗细（基于图像对角线长度，增加系数使线条更粗）
+        line_thickness = max(2, int(img_diagonal / 200))
+        
+        # 动态计算字体大小和粗细（增加系数使字体更大）
+        font_scale = max(0.5, img_diagonal / 400)
+        font_thickness = max(3, int(img_diagonal / 200))
+        
         if detect_result:
             for det in detect_result:
                 corners = det.get('corners') if isinstance(
@@ -86,16 +98,16 @@ class AprilTagDetectorBase:
                 if corners is not None:
                     pts = np.array(corners, dtype=np.int32).reshape(-1, 2)
                     cv2.polylines(overlay, [pts], isClosed=True, color=(
-                        0, 255, 0), thickness=2)
+                        0, 255, 0), thickness=line_thickness)
                     if tag_id is not None:
                         pt = tuple(int(x) for x in corners[0])
                         cv2.putText(overlay, str(tag_id), pt,
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-        from PIL import Image
-        overlay_pil = Image.fromarray(overlay.astype('uint8'), 'RGB')
-        return overlay_pil
+                                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 0, 0), font_thickness)
 
-    def get_result_text(self, detect_result: Optional[List[Detection]]) -> str:
+        return overlay
+
+    @staticmethod
+    def get_result_text(detect_result: Optional[List[Detection]]) -> str:
         """获取检测结果的文本描述"""
         if detect_result is None:
             return "无检测结果"
@@ -115,7 +127,9 @@ class AprilTagDetectorBase:
 class Tag36h11Detector(AprilTagDetectorBase):
     """Tag36h11 检测器"""
 
-    def __init__(self, config: TagDetectionConfig):
+    def __init__(self, config: Optional[TagDetectionConfig] = None):
+        if config is None:
+            config = TagDetectionConfig(families='tag36h11')
         if config.families != 'tag36h11':
             raise ValueError("Invalid tag family: expected 'tag36h11'")
         super().__init__(config)
@@ -133,4 +147,5 @@ class Tag36h11Detector(AprilTagDetectorBase):
             refine_edges=config.refine_edges,
             decode_sharpening=config.decode_sharpening,
         )
+    
         logger.info(f"[Tag36h11Detector] 配置已更新: {self.config}")

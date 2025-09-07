@@ -67,7 +67,8 @@ class Camera:
             raise ValueError(
                 "请先选择摄像头（select_camera_by_index / select_camera_info）")
         if self.connected:
-            self.disconnect()
+            logger.warning(f"摄像头 {self.info.name} 已连接")
+            return True
 
         try:
             backend = getattr(self.info, "backend", 0)
@@ -183,3 +184,14 @@ class Camera:
                 '\nheight: '+ str(self.height) +
                 '\nfps: '+ str(self.fps)
         )
+    
+    @property
+    def name(self) -> str:
+        return self.info.name if self.info else "未知"
+    
+    @property
+    def index(self) -> int:
+        return self.info.index if self.info else -1
+    
+    def get_status(self) -> str:
+        return self.__str__()

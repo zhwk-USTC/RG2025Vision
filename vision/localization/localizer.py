@@ -10,8 +10,7 @@ import numpy as np
 
 from ..detection.apriltag import TagDetections, TagDetection
 from .se2 import to_homogeneous_2d, invert_homogeneous_2d, mat2d_to_yaw
-from ..camera_node import CameraPose
-from .types import TagPose, CarPose
+from .types import TagPose, CarPose, CameraPose
 from core.logger import logger
 
 

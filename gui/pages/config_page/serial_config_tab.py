@@ -12,7 +12,7 @@ select_serial_port,
 ports_list
 )
 
-def render_serial_tab() -> None:
+def render_serial_config_tab() -> None:
     def on_save_config():
         save_serial_config()
         logger.info('串口配置已保存')

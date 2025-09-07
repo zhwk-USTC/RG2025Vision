@@ -7,11 +7,16 @@ class TagPose:
     - yaw: 旋转角度（弧度）
     表示 T_world_tag : world ← tag
     """
-    id: int
+    # id: int
     x: float
     y: float
     yaw: float
     
+@dataclass(slots=True)    
+class CameraPose:
+    x: float
+    y: float
+    yaw: float
 
 @dataclass(slots=True)
 class CarPose:

@@ -14,8 +14,6 @@ from core.config import load_config, VISION_CONFIG_PATH, save_config
 _vs: Optional[VisionSystem] = None
 _lock = Lock()  # 用于线程安全地访问 _vs
 
-CAM_NUM = 1
-
 def is_vision_initialized() -> bool:
     """
     检查 VisionSystem 是否已初始化。
@@ -39,13 +37,10 @@ def get_vision() -> VisionSystem:
             raise RuntimeError("VisionSystem 尚未初始化")
         return _vs
 
-def init_vision(cams: int = CAM_NUM) -> VisionSystem:
+def init_vision() -> VisionSystem:
     """
     初始化 VisionSystem 实例，并加载配置。
     如果实例已经存在，则返回已有实例。
-
-    Args:
-        cams (int): 相机数量，默认为 CAM_NUM。
 
     Returns:
         VisionSystem: 当前的单例实例
@@ -53,15 +48,13 @@ def init_vision(cams: int = CAM_NUM) -> VisionSystem:
     global _vs
     with _lock:
         if _vs is None:
-            _vs = VisionSystem(cam_num=cams)
             vision_config = load_config(VISION_CONFIG_PATH, VisionSystemConfig)
             if not vision_config:
                 logger.warning("未能加载视觉系统配置，使用空白配置")
             else:
-                _vs.set_config(vision_config)
                 logger.info(f"已加载视觉系统配置")
-            
-            logger.debug(f"[VisionSystem] 已初始化实例，包含 {cams} 个相机节点")
+            _vs = VisionSystem(vision_config)
+            logger.info(f"[VisionSystem] 已初始化实例，包含 {len(_vs._cameras)} 个相机节点")
         else:
             logger.info(f"[VisionSystem] 已存在实例，使用现有实例")
         return _vs

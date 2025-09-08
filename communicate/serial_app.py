@@ -5,7 +5,8 @@ from typing import Optional, Iterable, Tuple, Union
 
 from .serial import AsyncSerial, SerialConfig
 from serial.tools import list_ports
-from core.config import SERIAL_CONFIG_PATH, save_config, load_config
+from core.config import save_config, load_config
+from core.paths import SERIAL_CONFIG_PATH
 from core.logger import logger
 
 # 协议编解码器（类版本）

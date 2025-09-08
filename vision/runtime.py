@@ -8,7 +8,8 @@ from typing import Optional
 from threading import Lock
 from .vision_system import VisionSystem, VisionSystemConfig
 from core.logger import logger
-from core.config import load_config, VISION_CONFIG_PATH, save_config
+from core.config import load_config, save_config
+from core.paths import VISION_CONFIG_PATH
 
 # 全局变量：保存单例 VisionSystem
 _vs: Optional[VisionSystem] = None

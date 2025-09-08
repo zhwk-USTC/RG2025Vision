@@ -7,11 +7,11 @@ import threading
 
 from core.logger import logger
 from .camera import Camera, scan_cameras, CameraConfig
-from .detection.apriltag import TagDetections, TagDetectionConfig, Tag36h11Detector, AprilTagDetectorBase
+from .detection.apriltag import TagDetections, TagDetectionConfig, Tag36h11Detector
+from .detection.hsv import HSVDetector, HSVDetectConfig, HSVDetections
 from .detection.types import CameraIntrinsics
 from .localization.localizer import Localizer, LocalizerConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
-# from .camera_node import CamNodeConfig
 
 
 @dataclass(slots=True)
@@ -27,6 +27,14 @@ class TagDetectionPacket:
     t_ns: int
     idx: int
     dets: TagDetections
+    
+
+@dataclass(slots=True)
+class HSVDetectionPacket:
+    img_bgr: np.ndarray
+    t_ns: int
+    idx: int
+    dets: HSVDetections
 
 
 @dataclass
@@ -36,6 +44,7 @@ class VisionSystemConfig:
     camera_metadata: Dict[str, dict] = field(default_factory=dict)  # 存储相机内参等元信息
     tag36h11_detectors: Dict[str, TagDetectionConfig] = field(default_factory=dict)
     tag36h11_size: Optional[float] = None  # 标签边长，单位米
+    hsv_detectors: Dict[str, HSVDetectConfig] = field(default_factory=dict)
     # localizer: Optional[LocalizerConfig] = None
 
 
@@ -68,6 +77,9 @@ class VisionSystem:
         self._apriltag_36h11_detectors: Dict[str, Tag36h11Detector] = {}
         self._tag36h11_size: Optional[float] = None  # 标签边长，单位米
 
+        self._latest_hsv_packets: Dict[str, Optional[HSVDetectionPacket]] = {}
+        self._hsv_detectors: Dict[str, HSVDetector] = {}
+
         self.localizer: Optional[Localizer] = None
 
         scan_cameras()
@@ -85,6 +97,9 @@ class VisionSystem:
                     self._apriltag_36h11_detectors[key] = detector
                     logger.info(f"[VisionSystem] 添加 36h11 检测器 {key}")
                 
+                for key, hsv_cfg in VisionSystemConfig.hsv_detectors.items():
+                    self._hsv_detectors[key] = HSVDetector(hsv_cfg)
+                    logger.info(f"[VisionSystem] 添加 HSV 检测器 {key}")
                 self._tag36h11_size = VisionSystemConfig.tag36h11_size
                 self._camera_metadata = VisionSystemConfig.camera_metadata
 
@@ -119,6 +134,27 @@ class VisionSystem:
         if key in self._latest_detection_packets:
             del self._latest_detection_packets[key]
         logger.info(f"[VisionSystem] 移除 tag36h11 检测器 {key}")
+        
+    def add_hsv_detector(self, key: str, detector: HSVDetector = HSVDetector()) -> None:
+        if key not in self._cameras:
+            logger.warning(f"[VisionSystem] 添加 HSV 检测器失败: 未找到相机 {key}")
+            return
+        self._hsv_detectors[key] = detector
+        logger.info(f"[VisionSystem] 添加 HSV 检测器 {key}")
+
+    def remove_hsv_detector(self, key: str) -> None:
+        if key in self._hsv_detectors:
+            del self._hsv_detectors[key]
+        if key in self._latest_hsv_packets:
+            del self._latest_hsv_packets[key]
+        logger.info(f"[VisionSystem] 移除 HSV 检测器 {key}")
+
+    def get_latest_hsv_detection_packets(self, cam_key: str) -> Optional[HSVDetectionPacket]:
+        with self._detection_lock:
+            if cam_key not in self._hsv_detectors:
+                logger.warning(f"[VisionSystem] get_latest_hsv_detection_packets 未找到检测器 {cam_key}")
+                return None
+            return self._latest_hsv_packets.get(cam_key)
 
     def start(self) -> bool:
         """
@@ -211,7 +247,6 @@ class VisionSystem:
                 with self._frame_lock:
                     self._latest_frame_packets[k] = payload
 
-
     def _detect_tag36h11(self, keys: Optional[Union[str, List[str]]] = None) -> None:
         """
         使用最新帧缓存做一次 tag36h11 检测（并发）。
@@ -255,12 +290,6 @@ class VisionSystem:
                     results[k] = None
                     continue
 
-                # # （可选）要求内参存在；否则跳过
-                # intr = self._camera_metadata.get(k, {}).get("intrinsics")
-                # if intr is None:
-                #     results[k] = None
-                #     continue
-
                 work_keys.append(k)
 
         if not work_keys:
@@ -303,8 +332,80 @@ class VisionSystem:
         with self._detection_lock:
             self._latest_detection_packets.update(results)
 
+    def _detect_hsv(self, keys: Optional[Union[str, List[str]]] = None) -> None:
+        """
+        使用最新帧缓存做一次 HSV 检测（并发）。
+        keys: None=全量；str=单路；List[str]=多路
+        """
+        # 归一化目标键
+        if keys is None:
+            target_keys = list(self._cameras.keys())
+        elif isinstance(keys, str):
+            target_keys = [keys] if keys in self._cameras else []
+        else:
+            target_keys = [k for k in keys if k in self._cameras]
+        if not target_keys:
+            return
+
+        # 复制帧快照
+        with self._frame_lock:
+            latest_snap: Dict[str, Optional[FramePacket]] = {
+                k: self._latest_frame_packets.get(k) for k in target_keys
+            }
+
+        # 快速筛选可工作键
+        results: Dict[str, Optional[HSVDetectionPacket]] = {}
+        work_keys: List[str] = []
+        with self._detection_lock:
+            for k in target_keys:
+                if k not in self._hsv_detectors:
+                    results[k] = None
+                    continue
+                pkt = latest_snap.get(k)
+                if pkt is None or getattr(pkt, "img_bgr", None) is None:
+                    results[k] = None
+                    continue
+                work_keys.append(k)
+
+        if not work_keys:
+            return
+
+        # 并发检测
+        def _work(k: str):
+            try:
+                det = self._hsv_detectors[k]
+                pkt = latest_snap[k]  # 已校验不为 None
+                img: np.ndarray = pkt.img_bgr  # type: ignore
+                dets = det.detect(img)
+                return k, pkt, dets
+            except Exception as e:
+                raise RuntimeError(f"相机 {k} HSV 检测过程异常: {type(e).__name__}: {e}")
+
+        with ThreadPoolExecutor(max_workers=len(work_keys)) as ex:
+            futs = {ex.submit(_work, k): k for k in work_keys}
+            for fut in as_completed(futs):
+                k = futs[fut]
+                try:
+                    cam_key, pkt, dets = fut.result()
+                    if pkt is None or dets is None:
+                        results[cam_key] = None
+                        continue
+                    results[cam_key] = HSVDetectionPacket(
+                        img_bgr=pkt.img_bgr,
+                        t_ns=pkt.t_ns,
+                        idx=pkt.idx,
+                        dets=dets,
+                    )
+                except Exception as e:
+                    logger.warning(f"[VisionSystem] detect_hsv {k} 异常: {e}")
+                    results[k] = None
+
+        with self._detection_lock:
+            self._latest_hsv_packets.update(results)
+            
     def _detect(self) -> None:
         self._detect_tag36h11()
+        self._detect_hsv()
 
     def update(self) -> None:
         """
@@ -312,23 +413,7 @@ class VisionSystem:
         """
         try:
             self._update_frames()  # 先采帧
-            raise NotImplementedError
-            # 创建检测任务列表
-            tasks = [
-                node.read_frame_and_detect_async()
-                for node in self._cameras
-            ]
-            results = asyncio.gather(*tasks, return_exceptions=True)
-
-            # 处理结果
-            out: List[Optional[TagDetections]] = []
-            for node, res in zip(self._cameras, results):
-                alias = node.alias
-                if isinstance(res, BaseException):
-                    logger.warning(
-                        f"[VisionSystem] detect_once {alias} 异常: {res}")
-                    res = None
-                out.append(res)
+            self._detect()         # 再检测
         except Exception as e:
             logger.error(f"[VisionSystem] update 异常: {e}")
 
@@ -354,8 +439,14 @@ class VisionSystem:
     def get_config(self) -> VisionSystemConfig:
         cams = {k: cam.get_config() for k, cam in self._cameras.items()}
         tag36h11_detectors = {k: det.get_config() for k, det in self._apriltag_36h11_detectors.items()}
-        return VisionSystemConfig(cameras=cams, tag36h11_detectors=tag36h11_detectors)
-
+        hsv_detectors = {k: det.get_config() for k, det in self._hsv_detectors.items()}  # ★ 新增
+        return VisionSystemConfig(
+            cameras=cams,
+            camera_metadata=self._camera_metadata,
+            tag36h11_detectors=tag36h11_detectors,
+            tag36h11_size=self._tag36h11_size,
+            hsv_detectors=hsv_detectors,
+        )
     def set_config(self, config: VisionSystemConfig) -> None:
         raise NotImplementedError
     

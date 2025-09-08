@@ -1,5 +1,3 @@
-import json
-import os
 from typing import List, Dict, Tuple, Optional, Union
 from dataclasses import dataclass
 import numpy as np
@@ -33,11 +31,6 @@ DEFAULT_CONFIG = {
         'debug': 0
     }
 }
-
-CONFIG_DIR = os.path.join(os.path.dirname(__file__), '../.config')
-os.makedirs(CONFIG_DIR, exist_ok=True)
-CONFIG_PATH = os.path.join(CONFIG_DIR, 'apriltag_config.json')
-
 
 class AprilTagDetectorBase:
     """AprilTag 检测器基类"""

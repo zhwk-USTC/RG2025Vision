@@ -25,13 +25,3 @@ class CameraIntrinsics:
     p2: float = 0.0
     k3: float = 0.0
     
-@dataclass(slots=True)
-class CameraPose:
-    """摄像头在小车坐标系下的二维外参（x, y, yaw）
-    - x, y: 平移（m）
-    - yaw: 旋转角度（弧度）
-    表示  T_car_cam : car ← cam
-    """
-    x: float
-    y: float
-    yaw: float

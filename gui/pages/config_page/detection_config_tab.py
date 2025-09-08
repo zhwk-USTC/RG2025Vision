@@ -4,8 +4,8 @@ from typing import Optional
 from PIL import Image
 
 from vision import get_vision, save_vision_config
-from vision.camera import get_camera_info_list, Camera
-from vision.detection.apriltag import TagDetectionConfig, TagDetectionConfig, Tag36h11Detector
+from vision.detection.apriltag import TagDetectionConfig, Tag36h11Detector
+from vision.detection.hsv import HSVDetector, HSVDetectConfig
 from core.logger import logger
 
 
@@ -22,6 +22,7 @@ def render_detection_config_tab():
     with ui.row():
         ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
     render_tag36h11_configs()
+    render_hsv_configs()
     
 def render_tag36h11_configs():
     with ui.card():
@@ -153,3 +154,152 @@ def render_tag36h11_block(key: str, detector: Tag36h11Detector):
                     ui.label('是否优化边缘检测，提升精度但略慢').style('color:#888;font-size:13px')
 
             ui.button('应用配置', on_click=on_apply_tag36h11, color='primary')
+            
+def render_hsv_configs():
+    with ui.card():
+        ui.label('HSV 检测器配置').classes('text-h5')
+        vs = get_vision()
+
+        def on_add_hsv_detector():
+            new_name = new_detector_name_input.value
+            if not new_name:
+                logger.warning("未输入 HSV 检测器名称")
+                return
+            vs.add_hsv_detector(new_name)
+            logger.info(f"已添加 HSV 检测器: {new_name}")
+
+        with ui.row():
+            new_detector_name_input = ui.input(label='添加 HSV 检测器', placeholder='输入摄像头别名')
+            ui.button('添加 HSV 检测器', color='primary', on_click=lambda e: on_add_hsv_detector())
+
+        # 遍历已存在的 HSV 检测器
+        for key, detector in get_vision()._hsv_detectors.items():
+            render_hsv_block(key, detector)
+
+
+def render_hsv_block(key: str, detector: HSVDetector):
+    header_state = {'text': ''}
+
+    def _header_text() -> str:
+        alias = key or '未命名'
+        return f'{alias} · hsv'
+
+    def _refresh_header():
+        header_state['text'] = _header_text()
+
+    # ---- 事件处理：把滑条值写回配置，并更新右侧数值显示 ----
+    def on_hmin(v):  cfg.h_min = int(v or 0);              hmin_value.text  = f"{cfg.h_min:d}"
+    def on_hmax(v):  cfg.h_max = int(v or 0);              hmax_value.text  = f"{cfg.h_max:d}"
+    def on_smin(v):  cfg.s_min = int(v or 0);              smin_value.text  = f"{cfg.s_min:d}"
+    def on_vmin(v):  cfg.v_min = int(v or 0);              vmin_value.text  = f"{cfg.v_min:d}"
+    def on_gmin(v):  cfg.g_min = int(v or 0);              gmin_value.text  = f"{cfg.g_min:d}"
+    def on_gdom(v):  cfg.g_dom_ratio = float(v or 0);      gdom_value.text  = f"{cfg.g_dom_ratio:.2f}"
+    def on_min_area(v): cfg.min_area = int(v or 1);        min_area_value.text = f"{cfg.min_area:d}"
+    def on_max_area(v): cfg.max_area = int(v or 1);        max_area_value.text = f"{cfg.max_area:d}"
+    def on_circ(v):  cfg.circularity_min = float(v or 0);  circ_value.text  = f"{cfg.circularity_min:.2f}"
+    def on_open(v):  cfg.open_kernel = int(v or 1);        open_value.text  = f"{cfg.open_kernel:d}"
+    def on_maxres(v): 
+        cfg.max_results = int(v or 0)
+        maxres_value.text = f"{cfg.max_results:d}"
+
+    def on_apply_hsv():
+        detector.update_config(cfg)
+        logger.info(f'{key} 的 HSV 检测器配置已更新')
+
+    _refresh_header()
+    with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
+        with exp.add_slot('header'):
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('adjust')  # 圆形图标
+                ui.label().bind_text_from(header_state, 'text')
+
+        cfg = detector.get_config()
+        with ui.card():
+            ui.label('HSV 参数').classes('text-h6')
+            with ui.column().classes('q-gutter-xs'):
+                # 色相/饱和/亮度
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('H min').style('min-width:110px')
+                    ui.slider(value=cfg.h_min, min=0, max=179, step=1,
+                              on_change=lambda e: on_hmin(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    hmin_value = ui.label(f"{cfg.h_min:d}").style('min-width:48px;text-align:right')
+                    ui.label('色相下限 (0..179)').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('H max').style('min-width:110px')
+                    ui.slider(value=cfg.h_max, min=0, max=179, step=1,
+                              on_change=lambda e: on_hmax(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    hmax_value = ui.label(f"{cfg.h_max:d}").style('min-width:48px;text-align:right')
+                    ui.label('色相上限 (0..179)').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('S min').style('min-width:110px')
+                    ui.slider(value=cfg.s_min, min=0, max=255, step=1,
+                              on_change=lambda e: on_smin(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    smin_value = ui.label(f"{cfg.s_min:d}").style('min-width:48px;text-align:right')
+                    ui.label('饱和度下限 (0..255)').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('V min').style('min-width:110px')
+                    ui.slider(value=cfg.v_min, min=0, max=255, step=1,
+                              on_change=lambda e: on_vmin(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    vmin_value = ui.label(f"{cfg.v_min:d}").style('min-width:48px;text-align:right')
+                    ui.label('亮度下限 (0..255)').style('color:#888;font-size:13px')
+
+                # 绿色优势与强度
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('G min').style('min-width:110px')
+                    ui.slider(value=cfg.g_min, min=0, max=255, step=1,
+                              on_change=lambda e: on_gmin(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    gmin_value = ui.label(f"{cfg.g_min:d}").style('min-width:48px;text-align:right')
+                    ui.label('绿色通道强度下限').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('G / max(R,B)').style('min-width:110px')
+                    ui.slider(value=cfg.g_dom_ratio, min=1.0, max=2.0, step=0.05,
+                              on_change=lambda e: on_gdom(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    gdom_value = ui.label(f"{cfg.g_dom_ratio:.2f}").style('min-width:48px;text-align:right')
+                    ui.label('绿色优势比阈值').style('color:#888;font-size:13px')
+
+                # 形态与面积/圆度
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('min_area').style('min-width:110px')
+                    ui.slider(value=cfg.min_area, min=1, max=2000, step=1,
+                              on_change=lambda e: on_min_area(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    min_area_value = ui.label(f"{cfg.min_area:d}").style('min-width:48px;text-align:right')
+                    ui.label('最小连通域面积').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('max_area').style('min-width:110px')
+                    ui.slider(value=cfg.max_area, min=10, max=20000, step=10,
+                              on_change=lambda e: on_max_area(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    max_area_value = ui.label(f"{cfg.max_area:d}").style('min-width:48px;text-align:right')
+                    ui.label('最大连通域面积').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('circularity_min').style('min-width:110px')
+                    ui.slider(value=cfg.circularity_min, min=0.0, max=1.0, step=0.05,
+                              on_change=lambda e: on_circ(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    circ_value = ui.label(f"{cfg.circularity_min:.2f}").style('min-width:48px;text-align:right')
+                    ui.label('圆度阈值 4πA/P²').style('color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('open_kernel').style('min-width:110px')
+                    ui.slider(value=cfg.open_kernel, min=1, max=15, step=1,
+                              on_change=lambda e: on_open(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    open_value = ui.label(f"{cfg.open_kernel:d}").style('min-width:48px;text-align:right')
+                    ui.label('形态学开运算核大小 (去噪)').style('color:#888;font-size:13px')
+
+                # 输出数量
+                with ui.row().classes('items-center q-gutter-md'):
+                    ui.label('max_results').style('min-width:110px')
+                    ui.slider(value=cfg.max_results, min=0, max=50, step=1,
+                              on_change=lambda e: on_maxres(e.value)
+                              ).style('min-width:240px;max-width:400px;flex:1')
+                    maxres_value = ui.label(f"{cfg.max_results:d}").style('min-width:48px;text-align:right')
+                    ui.label('0 表示不限制数量').style('color:#888;font-size:13px')
+
+        ui.button('应用配置', on_click=on_apply_hsv, color='primary')

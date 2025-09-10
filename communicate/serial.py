@@ -1,8 +1,8 @@
-import asyncio
-import serial_asyncio
-import contextlib
 from typing import Optional, Callable, Union
 from dataclasses import dataclass
+import threading
+import time
+import serial
 
 @dataclass
 class SerialConfig:
@@ -10,97 +10,117 @@ class SerialConfig:
     baudrate: int = 115200
     chunk_size: int = 256
 
-
-class AsyncSerial:
+class SyncSerial:
     """
-    纯字节流版：
-    - 回调类型: Callable[[bytes], None]，每次回调一块原始 bytes
-    - send 仅接受 bytes / bytearray / memoryview
+    同步串口（基于 PySerial）
+    - set_recv_callback(cb): 每次收到一块 bytes 就回调一次
+    - start_receiving()/stop_receiving(): 以后台线程阻塞读取
+    - send(data): 同步发送原始 bytes
     """
     def __init__(self, config: SerialConfig = SerialConfig()):
-        self.port = config.port
-        self.baudrate = config.baudrate
-        self.chunk_size = max(1, int(config.chunk_size))
-
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self.cfg = config
+        self._ser: Optional[serial.Serial] = None
         self._callback: Optional[Callable[[bytes], None]] = None
-        self._task: Optional[asyncio.Task] = None
-        self._stop = asyncio.Event()
 
-    async def open(self):
+        self._rx_thread: Optional[threading.Thread] = None
+        self._rx_stop_flag = threading.Event()
+
+        # 保护串口对象的锁（写/关）
+        self._lock = threading.Lock()
+
+    # ---------- 打开/关闭 ----------
+    def open(self) -> bool:
+        """打开串口；返回是否成功。"""
         try:
-            self._reader, self._writer = await serial_asyncio.open_serial_connection(
-                url=self.port, baudrate=self.baudrate
+            self._ser = serial.Serial(
+                port=self.cfg.port,
+                baudrate=self.cfg.baudrate,
             )
+            return True
         except Exception as e:
-            print(f"打开串口失败: {e}")
+            print(f"[SyncSerial] 打开串口失败: {e}")
+            self._ser = None
+            return False
 
-    def set_recv_callback(self, callback: Optional[Callable[[bytes], None]]):
+    def close(self) -> None:
+        """停止接收线程并关闭串口。"""
+        self.stop_receiving()
+        with self._lock:
+            if self._ser is not None:
+                try:
+                    self._ser.close()
+                except Exception:
+                    pass
+                self._ser = None
+
+    # ---------- 发送 ----------
+    def send(self, data: Union[bytes, bytearray, memoryview]) -> None:
+        """同步发送原始字节；仅接受 bytes/bytearray/memoryview。"""
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise TypeError("send() 仅接受 bytes/bytearray/memoryview")
+        with self._lock:
+            if self._ser is None or not self._ser.is_open:
+                raise RuntimeError("串口未打开，请先调用 open()")
+            self._ser.write(bytes(data))
+            self._ser.flush()  # 可选：确保尽快刷出
+
+    # ---------- 接收（回调） ----------
+    def set_recv_callback(self, callback: Optional[Callable[[bytes], None]]) -> None:
         """设置接收回调：参数是 bytes（原始字节块）。"""
         self._callback = callback
 
-    async def send(self, data: Union[bytes, bytearray, memoryview]):
-        """发送原始字节；若传入非字节类型会抛出 TypeError。"""
-        if not self._writer:
-            raise RuntimeError("串口未打开，请先 await open()")
-        if isinstance(data, (bytes, bytearray, memoryview)):
-            self._writer.write(bytes(data))
-            await self._writer.drain()
-        else:
-            raise TypeError("send() 仅接受 bytes/bytearray/memoryview")
-
-    def start_receiving(self):
-        """在事件循环内启动读任务（幂等）。"""
-        if self._task and not self._task.done():
+    def start_receiving(self) -> None:
+        """启动后台读取线程（幂等）。"""
+        if self._rx_thread and self._rx_thread.is_alive():
             return
-        self._stop.clear()
-        self._task = asyncio.create_task(self._rx_loop(), name="AsyncSerialRecv")
+        if self._ser is None or not self._ser.is_open:
+            raise RuntimeError("串口未打开，请先调用 open()")
+        self._rx_stop_flag.clear()
+        self._rx_thread = threading.Thread(target=self._rx_loop, name="SyncSerialRecv", daemon=True)
+        self._rx_thread.start()
 
-    async def stop_receiving(self):
-        self._stop.set()
-        if self._task:
+    def stop_receiving(self, timeout: float = 1.0) -> None:
+        """请求停止接收线程并等待其退出。"""
+        self._rx_stop_flag.set()
+        th = self._rx_thread
+        if th and th.is_alive():
+            th.join(timeout=timeout)
+        self._rx_thread = None
+
+    # ---------- 工具 ----------
+    def is_open(self) -> bool:
+        return bool(self._ser and self._ser.is_open)
+
+    def get_config(self) -> SerialConfig:
+        return self.cfg
+
+    # ---------- 内部线程函数 ----------
+    def _rx_loop(self) -> None:
+        chunk_size = max(1, int(self.cfg.chunk_size))
+        while not self._rx_stop_flag.is_set():
             try:
-                await asyncio.wait_for(self._task, timeout=1.0)
-            except asyncio.TimeoutError:
-                self._task.cancel()
-                with contextlib.suppress(Exception):
-                    await self._task
-
-    async def close(self):
-        await self.stop_receiving()
-        if self._writer:
-            transport = self._writer.transport
-            if transport:
-                transport.close()
-            self._writer = None
-            self._reader = None
-
-    async def _rx_loop(self):
-        try:
-            while not self._stop.is_set():
-                # 读取一块字节数据（默认 256），为空则小睡让出事件循环
-                chunk = await self._reader.read(self.chunk_size)
-                if not chunk:
-                    await asyncio.sleep(0.005)
+                with self._lock:
+                    ser = self._ser
+                if ser is None or not ser.is_open:
+                    time.sleep(0.02)
                     continue
 
-                if self._callback:
+                # 阻塞式读（受 timeout_s 限制），尽量一次取 chunk_size
+                data = ser.read(chunk_size)
+                if not data:
+                    # 超时无数据：让出CPU
+                    time.sleep(0.002)
+                    continue
+
+                cb = self._callback
+                if cb:
                     try:
-                        self._callback(chunk)  # 直接回调原始 bytes
+                        cb(data)
                     except Exception:
-                        # 不让用户回调异常中断循环
+                        # 不让用户回调异常杀掉线程
                         pass
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            # 轻量容错：不向外抛，避免杀掉事件循环
-            await asyncio.sleep(0.05)
-    
-    
-    def get_config(self) -> SerialConfig:
-        return SerialConfig(
-            port=self.port,
-            baudrate=self.baudrate,
-            chunk_size=self.chunk_size
-        )
+
+            except Exception:
+                # 轻量容错：短暂休眠再继续
+                time.sleep(0.05)
+                continue

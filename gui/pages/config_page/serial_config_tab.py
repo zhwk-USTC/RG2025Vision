@@ -4,7 +4,7 @@ import asyncio
 from serial.tools import list_ports
 from nicegui import ui
 from core.logger import logger
-from communicate import (AsyncSerial, 
+from communicate import (
 start_serial, stop_serial, 
 scan_serial_ports, get_serial,
 save_serial_config, 
@@ -19,10 +19,10 @@ def render_serial_config_tab() -> None:
         
 
     async def on_connect_click():
-        await start_serial()
+        start_serial()
 
     async def on_disconnect_click():
-        await stop_serial()
+        stop_serial()
 
     def on_select_serial(port: Optional[str]):
         if port:
@@ -35,7 +35,7 @@ def render_serial_config_tab() -> None:
     port_options = {port.device: str(port) for port in ports}
 
     # 获取当前配置的端口，如果不在选项中则设为None
-    current_port = get_serial().port
+    current_port = get_serial().cfg.port
     if current_port not in port_options:
         current_port = None
 

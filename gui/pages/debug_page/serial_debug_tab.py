@@ -5,7 +5,6 @@ from nicegui import ui
 from core.logger import logger
 
 from communicate import (
-    AsyncSerial,
     start_serial, stop_serial,
     scan_serial_ports, get_serial,
     save_serial_config, select_serial_port,
@@ -149,11 +148,11 @@ def render_serial_tab() -> None:
         logger.info('串口配置已保存')
 
     async def on_connect_click():
-        await start_serial()
+        start_serial()
         logger.info('串口已连接')
 
     async def on_disconnect_click():
-        await stop_serial()
+        stop_serial()
         logger.info('串口已断开')
 
     def on_select_serial(port: Optional[str]):
@@ -168,7 +167,7 @@ def render_serial_tab() -> None:
 
 
     # 获取当前配置的端口，如果不在选项中则设为None
-    current_port = get_serial().port
+    current_port = get_serial().cfg.port
     if current_port not in port_options:
         current_port = None
         
@@ -221,7 +220,7 @@ def render_serial_tab() -> None:
 
         async def refresh_view():
             try:
-                frame_bytes, data_bytes, decoded = await get_latest_frame()
+                frame_bytes, data_bytes, decoded = get_latest_frame()
                 if frame_bytes:
                     status_label.set_text(
                         f'状态：已接收 | frame={len(frame_bytes)}B | data={len(data_bytes)}B'
@@ -267,7 +266,7 @@ def render_serial_tab() -> None:
                     logger.warning('请先选择至少一个变量')
                     return
 
-                await send_kv(kv)
+                send_kv(kv)
                 logger.info('测试帧已发送')
             except Exception as e:
                 logger.warning(f'[GUI] 发送测试帧失败: {e}')
@@ -278,15 +277,15 @@ def render_serial_tab() -> None:
 
             # 快捷按钮：只发某一个变量
             async def send_only_u8():
-                await send_kv({Var.TEST_VAR_U8: int(num_u8.value) & 0xFF})
+                send_kv({Var.TEST_VAR_U8: int(num_u8.value) & 0xFF})
                 logger.info('已发送: test_var_u8')
 
             async def send_only_u16():
-                await send_kv({Var.TEST_VAR_U16: int(num_u16.value) & 0xFFFF})
+                send_kv({Var.TEST_VAR_U16: int(num_u16.value) & 0xFFFF})
                 logger.info('已发送: test_var_u16')
 
             async def send_only_f32():
-                await send_kv({Var.TEST_VAR_F32: float(num_f32.value)})
+                send_kv({Var.TEST_VAR_F32: float(num_f32.value)})
                 logger.info('已发送: test_var_f32')
 
             ui.button('只发 U8', on_click=send_only_u8)

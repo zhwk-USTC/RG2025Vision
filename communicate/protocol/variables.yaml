@@ -1,8 +1,41 @@
-# 变量（列表形式）
 variables:
+  # --- 测试变量 ---
   - name: test_var_u8
     vtype: U8
   - name: test_var_u16
     vtype: U16
   - name: test_var_f32
+    vtype: F32
+
+  # --- 通用命令相关 ---
+  - name: SEQ       # 命令序号（递增）
+    vtype: U16
+  - name: ACK       # 命令确认（收到后回传）
+    vtype: U16
+
+  # --- 底盘移动相关 ---
+  - name: base_move_forward       # 向前移动, 单位：m
+    vtype: F32
+  - name: base_move_left          # 向左移动, 单位：m
+    vtype: F32
+  - name: base_rotate_yaw         # 逆时针旋转, 单位：rad
+    vtype: F32
+
+  # --- 机械臂相关 ---
+  - name: gripper_tag_x   # tag相对机械爪的x, 单位：m
+    vtype: F32
+  - name: gripper_tag_y   # tag相对机械爪的y, 单位：m
+    vtype: F32
+  - name: gripper_tag_z   # tag相对机械爪的z, 单位：m
+    vtype: F32
+   
+  - name: gripper_grasp      # 抓取信号，True表示执行抓取动作
+    vtype: BOOL
+  - name: gripper_release    # 松开信号，True表示执行松开动作
+    vtype: BOOL
+
+  # --- 发射相关 ---
+  - name: shooter_trigger       # 发射信号，True表示执行发射动作
+    vtype: BOOL
+  - name: shooter_wheel_speed   # 发射轮速度，单位：m/s
     vtype: F32

@@ -12,6 +12,7 @@ from core.logger import logger
 
 # 协议编解码器（类版本）
 from .protocol import FrameCodec, DataCodec
+from .protocol.protocol_py.data import DataPacket
 from .protocol.protocol_py.protocol_defs import Var, Msg  # 如无需要可移除
 
 # ----------------------------------------------------------------------
@@ -178,6 +179,10 @@ def get_latest_frame() -> Tuple[bytes, bytes, object | None]:
     with _frame_lock:
         return _latest_received_frame_bytes, _latest_frame_data_bytes, _latest_frame_decoded
 
+def get_latest_decoded() -> Optional[DataPacket]:
+    """返回最近一帧的 DATA 解码结果（DataPacket 或 None）。"""
+    with _frame_lock:
+        return _latest_frame_decoded
 
 def reset_latest():
     """清空“最近一帧”缓存（测试或复位时可用）。"""

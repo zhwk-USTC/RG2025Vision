@@ -13,7 +13,7 @@ async def on_gui_startup():
     serial = init_serial()
 async def on_gui_shutdown():
     reset_vision()
-    await stop_serial()
+    stop_serial()
 
 def main():
     """主程序入口"""

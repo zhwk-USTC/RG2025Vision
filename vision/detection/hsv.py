@@ -7,8 +7,6 @@ import cv2
 
 from core.logger import logger
 
-HSVDetections = List["HSVDetection"]
-
 @dataclass(slots=True)
 class HSVDetectConfig:
     # HSV 阈值（OpenCV: H ∈ [0..179], S/V ∈ [0..255]）
@@ -52,7 +50,7 @@ class HSVDetector:
         logger.info(f"[HSVDetector] 配置已更新: {self.config}")
 
     # --------- 主检测 ---------
-    def detect(self, image: np.ndarray) -> Optional[HSVDetections]:
+    def detect(self, image: np.ndarray) -> Optional[List[HSVDetection]]:
         """
         输入: BGR 或 RGB 或灰度（自动处理），输出: HSVDetection 列表（可能为空列表）
         返回 None 表示输入非法。
@@ -95,7 +93,7 @@ class HSVDetector:
 
         # 连通域
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
-        dets: HSVDetections = []
+        dets: List[HSVDetection] = []
 
         for lbl in range(1, num_labels):
             x, y, w, h, area = stats[lbl]
@@ -141,30 +139,37 @@ class HSVDetector:
 
     # --------- 可视化 ---------
     @staticmethod
-    def draw_overlay(img: Optional[np.ndarray], detect_result: Optional[HSVDetections]) -> Optional[np.ndarray]:
+    def draw_overlay(img: Optional[np.ndarray], detect_result: Optional[List[HSVDetection]]) -> Optional[np.ndarray]:
         if img is None or detect_result is None:
             return None
         overlay = np.asarray(img).copy()
 
         H, W = overlay.shape[:2]
         diag = float(np.hypot(H, W))
-        line_th = max(2, int(diag / 200))
+        line_th   = max(2, int(diag / 200))
         font_scale = max(0.5, diag / 400)
-        font_th = max(2, int(diag / 220))
+        font_th    = max(2, int(diag / 220))
+
+        red = (255, 0, 0)  # BGR: 红色
 
         for i, det in enumerate(detect_result):
             c = (int(round(det.center[0])), int(round(det.center[1])))
             r = max(2, int(round(det.radius)))
-            cv2.circle(overlay, c, r, (0, 255, 0), line_th)
-            cv2.circle(overlay, c, 2, (0, 255, 0), -1)
+
+            # 圆与中心点：红色
+            cv2.circle(overlay, c, r, red, line_th, cv2.LINE_AA)
+            cv2.circle(overlay, c, 2, red, -1, cv2.LINE_AA)
+
+            # 文字：红色
             label = f"#{i} peak={det.peak} area={det.area}"
             cv2.putText(overlay, label, (c[0] + 6, c[1] - 6),
-                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 0), font_th, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, red, font_th, cv2.LINE_AA)
+
         return overlay
 
     # --------- 文本结果 ---------
     @staticmethod
-    def get_result_text(detect_result: Optional[HSVDetections]) -> str:
+    def get_result_text(detect_result: Optional[List[HSVDetection]]) -> str:
         if detect_result is None:
             return "无检测结果"
         if len(detect_result) == 0:

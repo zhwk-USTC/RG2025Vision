@@ -8,11 +8,6 @@ from vision.detection.apriltag import TagDetectionConfig, Tag36h11Detector
 from vision.detection.hsv import HSVDetector, HSVDetectConfig
 from core.logger import logger
 
-
-def _empty_image():
-    return Image.fromarray(np.zeros((480, 640, 3), dtype=np.uint8))
-
-
 def render_detection_config_tab():
     vs = get_vision()
 
@@ -25,35 +20,9 @@ def render_detection_config_tab():
     render_hsv_configs()
     
 def render_tag36h11_configs():
-    with ui.card():
-        ui.label('Tag36h11 检测器配置').classes('text-h5')
-        vs = get_vision()
-        def on_add_tag36h11_detector():
-            new_detector_name = new_detector_name_input.value
-            if not new_detector_name:
-                logger.warning("未输入 tag36h11 检测器名称")
-                return
-            vs.add_tag36h11_detector(new_detector_name)
-
-        with ui.row():
-            new_detector_name_input = ui.input(label='添加 tag36h11 检测器', placeholder='输入摄像头别名')
-            ui.button('添加 tag36h11 检测器', color='primary', on_click=lambda e: on_add_tag36h11_detector())
-
-        for key, detector in vs._apriltag_36h11_detectors.items():
-            render_tag36h11_block(key, detector)
-
-def render_tag36h11_block(key: str, detector: Tag36h11Detector):
-    # ---- 头部显示的可变状态 ----
-    header_state = {'text': ''}
-
-    def _header_text() -> str:
-        alias = key or '未命名'
-        name = 'tag36h11'
-        return f'{alias} · {name}'
-
-    def _refresh_header():
-        header_state['text'] = _header_text()
-
+    vs = get_vision()
+    detector = vs._tag36h11_detector
+    tag36h11_config = detector.get_config()
     # ---- 事件处理 ----
     def on_quad_decimate(value):
         tag36h11_config.quad_decimate = float(
@@ -83,7 +52,16 @@ def render_tag36h11_block(key: str, detector: Tag36h11Detector):
 
     def on_apply_tag36h11():
         detector.update_config(tag36h11_config)
-        logger.info(f'{key} 的 AprilTag36h11 检测器配置已更新')
+        logger.info(f'AprilTag36h11 检测器配置已更新')
+    # ---- 头部显示的可变状态 ----
+    header_state = {'text': ''}
+
+    def _header_text() -> str:
+        return 'tag36h11'
+
+    def _refresh_header():
+        header_state['text'] = _header_text()
+
 
     # ---- 可展开的元素 ----
     _refresh_header()
@@ -93,7 +71,8 @@ def render_tag36h11_block(key: str, detector: Tag36h11Detector):
             with ui.row().classes('items-center gap-2'):
                 ui.icon('qr_code')
                 ui.label().bind_text_from(header_state, 'text')
-        tag36h11_config = detector.get_config()
+        
+        ui.label('Tag36h11 检测器配置').classes('text-h5')
         with ui.card():
             ui.label('tag36h11参数').classes('text-h6')
             # 每行一个参数，label-滑条-数值，并加中文注释说明作用
@@ -156,37 +135,10 @@ def render_tag36h11_block(key: str, detector: Tag36h11Detector):
             ui.button('应用配置', on_click=on_apply_tag36h11, color='primary')
             
 def render_hsv_configs():
-    with ui.card():
-        ui.label('HSV 检测器配置').classes('text-h5')
-        vs = get_vision()
-
-        def on_add_hsv_detector():
-            new_name = new_detector_name_input.value
-            if not new_name:
-                logger.warning("未输入 HSV 检测器名称")
-                return
-            vs.add_hsv_detector(new_name)
-            logger.info(f"已添加 HSV 检测器: {new_name}")
-
-        with ui.row():
-            new_detector_name_input = ui.input(label='添加 HSV 检测器', placeholder='输入摄像头别名')
-            ui.button('添加 HSV 检测器', color='primary', on_click=lambda e: on_add_hsv_detector())
-
-        # 遍历已存在的 HSV 检测器
-        for key, detector in get_vision()._hsv_detectors.items():
-            render_hsv_block(key, detector)
-
-
-def render_hsv_block(key: str, detector: HSVDetector):
-    header_state = {'text': ''}
-
-    def _header_text() -> str:
-        alias = key or '未命名'
-        return f'{alias} · hsv'
-
-    def _refresh_header():
-        header_state['text'] = _header_text()
-
+    detector = get_vision()._hsv_detector
+    cfg = detector.get_config()
+    
+    
     # ---- 事件处理：把滑条值写回配置，并更新右侧数值显示 ----
     def on_hmin(v):  cfg.h_min = int(v or 0);              hmin_value.text  = f"{cfg.h_min:d}"
     def on_hmax(v):  cfg.h_max = int(v or 0);              hmax_value.text  = f"{cfg.h_max:d}"
@@ -204,8 +156,14 @@ def render_hsv_block(key: str, detector: HSVDetector):
 
     def on_apply_hsv():
         detector.update_config(cfg)
-        logger.info(f'{key} 的 HSV 检测器配置已更新')
-
+        logger.info(f'HSV 检测器配置已更新')
+        
+    
+    header_state = {'text': ''}
+    def _header_text() -> str:
+        return  'hsv'
+    def _refresh_header():
+        header_state['text'] = _header_text()
     _refresh_header()
     with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
         with exp.add_slot('header'):
@@ -213,7 +171,7 @@ def render_hsv_block(key: str, detector: HSVDetector):
                 ui.icon('adjust')  # 圆形图标
                 ui.label().bind_text_from(header_state, 'text')
 
-        cfg = detector.get_config()
+        ui.label('HSV 检测器配置').classes('text-h5')
         with ui.card():
             ui.label('HSV 参数').classes('text-h6')
             with ui.column().classes('q-gutter-xs'):

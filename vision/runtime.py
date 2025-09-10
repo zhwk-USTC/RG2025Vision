@@ -60,21 +60,6 @@ def init_vision() -> VisionSystem:
             logger.info(f"[VisionSystem] 已存在实例，使用现有实例")
         return _vs
 
-def start_vision() -> None:
-    """
-    启动 VisionSystem 实例，连接所有相机。
-    如果实例尚未初始化，则先进行初始化。
-
-    Raises:
-        RuntimeError: 如果启动过程中出现错误
-    """
-    vs = get_vision()
-    ok = vs.start()
-    if not ok:
-        raise RuntimeError("VisionSystem 启动失败，检查相机连接")
-    logger.info("VisionSystem 已启动")
-    
-    
 def reset_vision() -> None:
     """
     重置 VisionSystem 单例实例，销毁当前实例并清空全局存储。
@@ -92,7 +77,7 @@ def reset_vision() -> None:
             _vs = None  # 将单例指针置为空
     # 在锁外进行销毁与清理操作，避免死锁
     if old is not None:
-        old.close()  # 调用 VisionSystem 的关闭方法，释放资源
+        old.shutdown()
 
 def save_vision_config() -> None:
     """

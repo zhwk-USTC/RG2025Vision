@@ -8,8 +8,6 @@ from .types import CameraIntrinsics
 
 TagDetection = Detection
 
-TagDetections = List[TagDetection]
-
 @dataclass(slots=True)
 class TagDetectionConfig:
     families: str = 'tag36h11'
@@ -46,7 +44,7 @@ class AprilTagDetectorBase:
             decode_sharpening=config.decode_sharpening,
         )
 
-    def detect(self, image: np.ndarray, intrinsics: Optional[CameraIntrinsics] = None, tag_size: Optional[float] = None) -> Optional[TagDetections]:
+    def detect(self, image: np.ndarray, intrinsics: Optional[CameraIntrinsics] = None, tag_size: Optional[float] = None) -> Optional[List[TagDetection]]:
         """进行 AprilTag 检测，并返回结果"""
         if image.ndim == 3:
             image = np.mean(image, axis=2).astype(np.uint8)
@@ -115,6 +113,20 @@ class AprilTagDetectorBase:
     def get_config(self) -> TagDetectionConfig:
         """获取检测器的配置"""
         return self.config
+    
+    def update_config(self, config: TagDetectionConfig) -> None:
+        """更新检测器配置"""
+        self.config = config
+        self.detector = Detector(
+            families=config.families,
+            nthreads=config.nthreads,
+            quad_decimate=config.quad_decimate,
+            quad_sigma=config.quad_sigma,
+            refine_edges=config.refine_edges,
+            decode_sharpening=config.decode_sharpening,
+        )
+    
+        logger.info(f"[ApriltagDetector] 配置已更新: {self.config}")
 
 
 class Tag36h11Detector(AprilTagDetectorBase):
@@ -131,14 +143,4 @@ class Tag36h11Detector(AprilTagDetectorBase):
         """更新检测器配置"""
         if config.families != 'tag36h11':
             raise ValueError("Invalid tag family: expected 'tag36h11'")
-        self.config = config
-        self.detector = Detector(
-            families=config.families,
-            nthreads=config.nthreads,
-            quad_decimate=config.quad_decimate,
-            quad_sigma=config.quad_sigma,
-            refine_edges=config.refine_edges,
-            decode_sharpening=config.decode_sharpening,
-        )
-    
-        logger.info(f"[Tag36h11Detector] 配置已更新: {self.config}")
+        super().update_config(config)

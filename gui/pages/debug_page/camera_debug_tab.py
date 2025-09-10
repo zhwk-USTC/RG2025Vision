@@ -61,9 +61,8 @@ def render_camera_block(key:str,cam: Camera):
             _debug_loop = None
             def _read_and_update_frame():
                 vs = get_vision()
-                vs._update_frames(keys=key)
-                raw_frame_packet = vs.get_latest_frame_packet(key)
-                processed_raw_img = prepare_image_for_display(raw_frame_packet.img_bgr if raw_frame_packet else None)
+                frame = vs.read_frame(key=key)  # type: ignore
+                processed_raw_img = prepare_image_for_display(frame)
                 img_widget.set_source(processed_raw_img)
                 cam_status_text = cam.get_status()
                 cam_status_widget.set_content('摄像头状态：\n'+cam_status_text)
@@ -88,15 +87,6 @@ def render_camera_block(key:str,cam: Camera):
 
 def render_camera_debug_tab():
     vs = get_vision()
-    def on_save_config():
-        save_vision_config()
-    def on_connect_all():
-        vs.start()
-    def on_disconnect_all():
-        vs.stop()
-    with ui.row().classes('q-gutter-md q-mb-md'):
-        ui.button('连接所有摄像头', color='primary', on_click=on_connect_all)
-        ui.button('断开所有摄像头', color='negative', on_click=on_disconnect_all)
 
     for key, cam in vs._cameras.items():
         render_camera_block(key, cam)

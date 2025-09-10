@@ -10,6 +10,8 @@ from .camera import Camera, scan_cameras, CameraConfig
 from .detection.apriltag import TagDetection, TagDetectionConfig, Tag36h11Detector
 from .detection.hsv import HSVDetector, HSVDetectConfig, HSVDetection
 from .detection.types import CameraIntrinsics
+from .localization.types import TagPose, CameraPose
+from .localization.simple_localizer import SingleTagLocalizer
 
 @dataclass
 class VisionSystemConfig:
@@ -21,7 +23,6 @@ class VisionSystemConfig:
         families='tag36h11')
     tag36h11_size: Optional[float] = None  # 标签边长，单位米
     hsv_detector: HSVDetectConfig = HSVDetectConfig()
-    # localizer: Optional[LocalizerConfig] = None
 
 
 CAM_KEY_TYPE = Literal["front", "left", "gripper"]
@@ -35,13 +36,14 @@ class VisionSystem:
         # ---------- Cameras ----------
         self._cameras: Dict[str, Camera] = {}
         self._camera_metadata: Dict[str, dict] = {}
-
+        self._latest_frames: Dict[str,Optional[np.ndarray]] = {}
         # ---------- Detection ----------
         self._tag36h11_detector: Tag36h11Detector = Tag36h11Detector()
         self._tag36h11_size: Optional[float] = None  # 标签边长，单位米
         self._hsv_detector: HSVDetector = HSVDetector()
+        self._localizer: SingleTagLocalizer = SingleTagLocalizer()
 
-        # self.localizer: Optional[Localizer] = None
+    
 
         scan_cameras()
         try:
@@ -85,13 +87,17 @@ class VisionSystem:
             return None
 
         frame = cam.read_frame()
+        self._latest_frames[key] = frame
         return frame
     
     def get_camera_intrinsics(self, key: CAM_KEY_TYPE) -> Optional[CameraIntrinsics]:
         meta = self._camera_metadata.get(key, {})
         intrinsics = meta.get("intrinsics")
         return intrinsics
-
+    
+    def get_latest_frame(self,key: CAM_KEY_TYPE) -> Optional[np.ndarray]:
+        return self._latest_frames.get(key)
+    
     def detect_tag36h11(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], *, tag_size: Optional[float] = None) -> Optional[List[TagDetection]]:
         if frame is None:
             logger.error(f"[VisionSystem] detect_tag36h11 输入帧为空")
@@ -112,7 +118,9 @@ class VisionSystem:
         result = detector.detect(frame)
         return result
     
-    
+    def locate_from_tag(self, detection: TagDetection) -> Optional[CameraPose]:
+        return self._localizer.update(detection)
+
     def shutdown(self) -> None:
         for key, cam in self._cameras.items():
             if cam.connected:

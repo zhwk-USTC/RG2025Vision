@@ -76,7 +76,7 @@ def render_camera_block(key: str, cam: Camera):
             else:
                 img_widget.set_source(_empty_image())
             status_widget.set_content(cam.get_status())
-            logger.info(f'摄像头 {cam.name} 图像已刷新')
+            # logger.info(f'摄像头 {cam.name} 图像已刷新')
         except Exception as e:
             logger.error(f'摄像头 {cam.name} 图像刷新失败: {e}')
 
@@ -203,11 +203,11 @@ def render_camera_block(key: str, cam: Camera):
                         ui.switch('关AE', value=bool(cfg.auto_exposure_off),
                                   on_change=lambda e: setattr(cfg, 'auto_exposure_off', bool(e.value))
                                   ).props('dense').classes('col-span-1')
-                        ui.number(label='曝光(ms)',
-                                  value=cfg.exposure_ms if cfg.exposure_ms is not None else None,
-                                  min=0.05, step=0.05,
-                                  on_change=lambda e: setattr(cfg, 'exposure_ms', float(e.value) if e.value else None)
-                                  ).props('dense')
+                        # ui.number(label='曝光(ms)',
+                        #           value=cfg.exposure_ms if cfg.exposure_ms is not None else None,
+                        #           min=0.0, step=0.0001,
+                        #           on_change=lambda e: setattr(cfg, 'exposure_ms', float(e.value) if e.value else None)
+                        #           ).props('dense')
                         ui.number(label='曝光(raw)',
                                   value=cfg.exposure if cfg.exposure is not None else None,
                                   step=1,
@@ -220,20 +220,20 @@ def render_camera_block(key: str, cam: Camera):
                                   ).props('dense')
                     ui.label('提示：更长曝光+更低增益通常噪点更少；但需防抖与运动模糊。').classes('text-caption text-grey-6')
 
-                    # --- 白平衡 ---
-                    with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):
-                        ui.label('白平衡').classes('text-primary text-bold')
-                        info_tip('关闭自动白平衡(AWB)后可设色温(K)。室内黄光约2700–3200K，日光约5000–6500K。')
-                    with ui.grid(columns=2).classes('items-center gap-2'):
-                        ui.switch('关AWB', value=bool(cfg.auto_wb_off),
-                                  on_change=lambda e: setattr(cfg, 'auto_wb_off', bool(e.value))
-                                  ).props('dense')
-                        ui.number(label='色温(K)',
-                                  value=cfg.wb_temperature if cfg.wb_temperature is not None else None,
-                                  min=2000, max=9000, step=50,
-                                  on_change=lambda e: setattr(cfg, 'wb_temperature', int(e.value) if e.value else None)
-                                  ).props('dense')
-                    ui.label('提示：固定色温便于多相机一致与后处理复现。').classes('text-caption text-grey-6')
+                    # # --- 白平衡 ---
+                    # with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):
+                    #     ui.label('白平衡').classes('text-primary text-bold')
+                    #     info_tip('关闭自动白平衡(AWB)后可设色温(K)。室内黄光约2700–3200K，日光约5000–6500K。')
+                    # with ui.grid(columns=2).classes('items-center gap-2'):
+                    #     ui.switch('关AWB', value=bool(cfg.auto_wb_off),
+                    #               on_change=lambda e: setattr(cfg, 'auto_wb_off', bool(e.value))
+                    #               ).props('dense')
+                    #     ui.number(label='色温(K)',
+                    #               value=cfg.wb_temperature if cfg.wb_temperature is not None else None,
+                    #               min=2000, max=9000, step=50,
+                    #               on_change=lambda e: setattr(cfg, 'wb_temperature', int(e.value) if e.value else None)
+                    #               ).props('dense')
+                    # ui.label('提示：固定色温便于多相机一致与后处理复现。').classes('text-caption text-grey-6')
 
                     # # --- 对焦 ---
                     # with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):

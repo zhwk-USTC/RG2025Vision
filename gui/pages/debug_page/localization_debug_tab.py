@@ -23,7 +23,7 @@ def np_to_pil(img_np):
     return Image.fromarray(img_np.astype('uint8'), 'RGB')
 
 def get_empty_img():
-    return Image.new("RGB", (640, 480), (200, 200, 200))
+    return Image.new("RGB", (320, 240), (200, 200, 200))
 
 def get_tag36h11_debug_img():
     try:

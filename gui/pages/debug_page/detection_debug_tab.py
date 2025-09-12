@@ -36,7 +36,7 @@ def get_green_dot_debug_img(size: int = 400, radius: int = 10,
     return img
 
 def get_empty_img():
-    return Image.new("RGB", (640, 480), (200, 200, 200))
+    return Image.new("RGB", (320, 240), (200, 200, 200))
 
 def prepare_image_for_display(img_np: Optional[Union[np.ndarray, Image.Image]]) -> Image.Image:
     """将numpy数组或PIL图像转换为适合显示的PIL格式"""

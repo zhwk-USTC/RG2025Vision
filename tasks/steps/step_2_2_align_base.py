@@ -1,4 +1,5 @@
 from typing import Any
+from ..debug_vars import set_debug_var
 
 class Step22AlignBase:
     """
@@ -8,4 +9,5 @@ class Step22AlignBase:
         pass
 
     def run(self) -> bool:
+        set_debug_var('align_base_status', 'aligned')
         return True

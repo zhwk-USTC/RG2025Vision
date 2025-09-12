@@ -2,6 +2,7 @@ from time import time, sleep
 from typing import Optional
 from vision import get_vision
 from core.logger import logger
+from ..debug_vars import reset_debug_vars
 
 class Step0InitSelfcheck:
     """
@@ -12,4 +13,5 @@ class Step0InitSelfcheck:
         pass
 
     def run(self) -> bool:
+        reset_debug_vars()
         return True

@@ -18,7 +18,7 @@ def np_to_pil(img_np):
 
 
 def get_empty_img():
-    return Image.new("RGB", (640, 480), (200, 200, 200))
+    return Image.new("RGB", (320,240), (200, 200, 200))
 
 
 def prepare_image_for_display(img_np: Optional[Union[np.ndarray, Image.Image]]) -> Image.Image:

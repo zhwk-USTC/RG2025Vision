@@ -35,7 +35,13 @@ variables:
     vtype: BOOL
 
   # --- 发射相关 ---
-  - name: shooter_trigger       # 发射信号，True表示执行发射动作
+  - name: dart_launch           # 推进飞镖，True表示推进飞镖向前
     vtype: BOOL
-  - name: shooter_wheel_speed   # 发射轮速度，单位：m/s
+  - name: dart_backward         # 推进飞镖向后，True表示推进飞镖向后运动
+    vtype: BOOL
+  - name: friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
+    vtype: BOOL
+  - name: friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮
+    vtype: BOOL
+  - name: friction_wheel_speed  # 摩擦轮速度，单位：m/s
     vtype: F32

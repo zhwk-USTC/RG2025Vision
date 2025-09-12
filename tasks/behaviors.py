@@ -20,43 +20,56 @@ def wait_for_ack(seq):
             break
         time.sleep(0.01)
 
-def base_move(forward: float, left: float) -> int:
+def base_move(forward: float, left: float, wait_ack: bool = False):
     global _seq
     send_kv({Var.BASE_MOVE_FORWARD: forward, Var.BASE_MOVE_LEFT: left, Var.SEQ: _seq})
-    return _seq
+    if wait_ack:
+        wait_for_ack(_seq)
+    _seq += 1
 
-def base_rotate(yaw: float) -> int:
+def base_rotate(yaw: float, wait_ack: bool = False):
     global _seq
     send_kv({Var.BASE_ROTATE_YAW: yaw, Var.SEQ: _seq})
+    if wait_ack:
+        wait_for_ack(_seq)
     _seq += 1
-    return _seq
 
-def send_gripper_tag_pos(x: float, y: float, z: float) -> int:
+def send_gripper_tag_pos(x: float, y: float, z: float, wait_ack: bool = False):
     global _seq
     send_kv({Var.GRIPPER_TAG_X: x, Var.GRIPPER_TAG_Y: y, Var.GRIPPER_TAG_Z: z, Var.SEQ: _seq})
+    if wait_ack:
+        wait_for_ack(_seq)
     _seq += 1
-    return _seq
 
-def gripper_grasp() -> int:
+def gripper_grasp(wait_ack: bool = False):
     global _seq
     send_kv({Var.GRIPPER_GRASP: True, Var.SEQ: _seq})
+    if wait_ack:
+        wait_for_ack(_seq)
     _seq += 1
-    return _seq
 
-def gripper_release() -> int:
+def gripper_release(wait_ack: bool = False):
     global _seq
     send_kv({Var.GRIPPER_RELEASE: True, Var.SEQ: _seq})
+    if wait_ack:
+        wait_for_ack(_seq)
     _seq += 1
-    return _seq
 
-def set_fire_speed(speed: float) -> int:
+def set_fire_speed(speed: float, wait_ack: bool = False):
     global _seq
-    send_kv({Var.FIRE_SPEED: speed, Var.SEQ: _seq})
+    send_kv({Var.FRICTION_WHEEL_SPEED: speed, Var.SEQ: _seq})
+    if wait_ack:
+        wait_for_ack(_seq)
     _seq += 1
-    return _seq
 
-def fire_once() -> int:
+def fire_once():
     global _seq
-    send_kv({Var.FIRE: True, Var.SEQ: _seq})
+    send_kv({Var.FRICTION_WHEEL_START: True, Var.SEQ: _seq})
+    send_kv({Var.DART_LAUNCH: True, Var.SEQ: _seq})
+    wait_for_ack(_seq)
     _seq += 1
-    return _seq
+    send_kv({Var.FRICTION_WHEEL_STOP: True, Var.SEQ: _seq})
+    send_kv({Var.DART_BACKWARD: True, Var.SEQ: _seq})
+    wait_for_ack(_seq)
+    _seq += 1
+    

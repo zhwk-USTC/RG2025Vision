@@ -1,6 +1,6 @@
 from ..behaviors import gripper_grasp
 
-class Step24GraspDart:
+class Step23Grasp:
     """机械臂对齐到飞镖位置"""
     def __init__(self):
         pass

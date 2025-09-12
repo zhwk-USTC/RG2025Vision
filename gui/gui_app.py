@@ -11,6 +11,9 @@ def render_nav_drawer():
             with ui.item(on_click=lambda: ui.navigate.to('/')).classes('q-hoverable q-pa-md'):
                 ui.icon('home')
                 ui.item_section('主页面')
+            # with ui.item(on_click=lambda: ui.navigate.to('/classic')).classes('q-hoverable q-pa-md'):
+            #     ui.icon('view_classic')
+            #     ui.item_section('经典版')
             with ui.item(on_click=lambda: ui.navigate.to('/debug')).classes('q-hoverable q-pa-md'):
                 ui.icon('build')
                 ui.item_section('调试')
@@ -26,6 +29,11 @@ def render_nav_drawer():
 
 @ui.page('/')
 def main_page():
+    render_nav_drawer()
+    render_enhanced_main_page()
+
+@ui.page('/classic')
+def classic_main_page():
     render_nav_drawer()
     render_main_page()
 

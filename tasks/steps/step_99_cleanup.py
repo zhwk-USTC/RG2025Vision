@@ -1,7 +1,9 @@
 from core.logger import logger
 from vision import get_vision
 from communicate import stop_serial
-from ..debug_vars import reset_debug_vars, set_debug_var
+from time import sleep
+from ..behaviors import *
+from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
 import time
 
 class Step999Cleanup:
@@ -54,8 +56,8 @@ class Step999Cleanup:
 
         self._done = True
         
-        set_debug_var('cleanup_done', True)
-        set_debug_var('program_exiting', 'program will exit in 10 seconds')
+        set_debug_var('cleanup_done', True, DebugLevel.SUCCESS, DebugCategory.STATUS, "清理任务已完成")
+        set_debug_var('program_exiting', 'program will exit in 10 seconds', DebugLevel.INFO, DebugCategory.STATUS, "程序即将退出")
         logger.info("[Cleanup] 任务清理完成")
         logger.info("10秒后程序退出")
         time.sleep(10)

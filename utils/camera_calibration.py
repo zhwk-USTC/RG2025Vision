@@ -301,10 +301,11 @@ def process_image_folder(folder_path, calibrator: CameraCalibrator, output_file=
     
     # 保存结果
     if output_file is None:
-        # 如果没有指定输出文件，使用默认路径
+        # 如果没有指定输出文件，使用默认路径并添加时间戳
         config_dir = os.path.join(os.path.dirname(__file__), '.config')
         os.makedirs(config_dir, exist_ok=True)
-        output_file = os.path.join(config_dir, 'camera_intrinsics.json')
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(config_dir, f'camera_intrinsics_{timestamp}.json')
     
     # 保存内参
     save_intrinsics(intrinsics, output_file)
@@ -325,11 +326,11 @@ def main():
     parser.add_argument('-i', '--input', '--dir', '--image_dir', 
                         dest='image_dir',
                         type=str, required=True, 
-                        help='标定图片文件夹路径，应包含cam0、cam1等子文件夹')
+                        help='标定图片文件夹路径，直接指向包含标定图片的文件夹')
     parser.add_argument('-o', '--output', '--output_path', 
                         dest='output_path',
                         type=str, 
-                        help='输出内参文件路径 (默认: .config/camera_intrinsics.json)')
+                        help='输出内参文件路径 (默认: .config/camera_intrinsics_YYYYMMDD_HHMMSS.json)')
     parser.add_argument('--width', '--board_width', 
                         dest='board_width',
                         type=int, default=9, 
@@ -349,63 +350,33 @@ def main():
         print(f"请使用 -i 或 --input 指定有效的图片文件夹路径")
         return 1
 
-    # 自动检测存在的相机文件夹（cam0、cam1、cam2）
-    all_cam_folders = ['cam0', 'cam1', 'cam2']
-    cam_folders = []
-    for cam_folder in all_cam_folders:
-        cam_path = os.path.join(args.image_dir, cam_folder)
-        if os.path.isdir(cam_path):
-            cam_folders.append(cam_folder)
+    print(f"开始对文件夹 {image_dir} 进行标定")
 
-    if not cam_folders:
-        print("未找到任何有效的相机文件夹（cam0、cam1、cam2）")
-        return 1
-
-    print(f"检测到 {len(cam_folders)} 个相机文件夹: {', '.join(cam_folders)}")
-
-    # 创建输出目录和输出文件路径
+    # 创建输出文件路径
     if args.output_path is not None:
         output_file = args.output_path
     else:
         config_dir = os.path.join(os.path.dirname(__file__), '.config')
         os.makedirs(config_dir, exist_ok=True)
-        output_file = os.path.join(config_dir, 'camera_intrinsics.json')
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(config_dir, f'camera_intrinsics_{timestamp}.json')
 
-    print(f"将保存所有标定结果到: {output_file}")
+    print(f"将保存标定结果到: {output_file}")
 
-    # 处理每个相机文件夹，收集结果
-    intrinsics_list = []
-    success_count = 0
+    # 创建标定器并处理图片文件夹
+    calibrator = CameraCalibrator(
+        board_size=(args.board_width, args.board_height)
+    )
 
-    for cam_id, cam_folder in enumerate(cam_folders):
-        cam_path = os.path.join(args.image_dir, cam_folder)
-        print(f"\n===== 开始处理相机 {cam_id} ({cam_folder}) =====")
-
-        calibrator = CameraCalibrator(
-            board_size=(args.board_width, args.board_height)
-        )
-
-        success = process_image_folder(cam_path, calibrator, None)
-
-        if success and calibrator.intrinsics is not None:
-            intrinsics_list.append(asdict(calibrator.intrinsics))
-            success_count += 1
-            print(f"相机 {cam_id} ({cam_folder}) 标定成功")
-        else:
-            print(f"相机 {cam_id} ({cam_folder}) 标定失败")
-
-    # 统一保存到一个文件
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(intrinsics_list, f, indent=2)
-        print(f"所有标定结果已保存至: {output_file}")
-    except Exception as e:
-        print(f"保存标定结果失败: {e}")
+    success = process_image_folder(image_dir, calibrator, output_file)
 
     print(f"\n===== 标定过程完成 =====")
-    print(f"成功标定 {success_count}/{len(cam_folders)} 个相机")
-
-    return 0 if success_count == len(cam_folders) else 1
+    if success:
+        print("标定成功")
+        return 0
+    else:
+        print("标定失败")
+        return 1
 
 
 if __name__ == "__main__":

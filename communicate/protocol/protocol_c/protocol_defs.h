@@ -1,0 +1,77 @@
+// Auto-generated. DO NOT EDIT MANUALLY.
+// Generated at UTC 2025-09-14 07:13:12
+#pragma once
+#include <stdint.h>
+
+#define PROTOCOL_DATA_VER_FULL  20250914071312ULL
+#define PROTOCOL_DATA_VER       0x10
+
+// MSG roles
+#define MSG_PC_TO_MCU 0x01
+#define MSG_MCU_TO_PC 0x02
+
+// Variable IDs (T in TLV)
+#define VAR_FRICTION_WHEEL_SPEED 0x01
+#define VAR_DART_BACKWARD 0x02
+#define VAR_GRIPPER_RELEASE 0x04
+#define VAR_GRIPPER_TAG_Y 0x15
+#define VAR_BASE_MOVE_FORWARD 0x34
+#define VAR_TEST_VAR_F32 0x5D
+#define VAR_TEST_VAR_U8 0x67
+#define VAR_GRIPPER_TAG_X 0x69
+#define VAR_DATA_ERROR 0x6A
+#define VAR_BASE_STOP 0x7B
+#define VAR_DART_LAUNCH 0x90
+#define VAR_FRICTION_WHEEL_STOP 0xA6
+#define VAR_GRIPPER_TAG_Z 0xC4
+#define VAR_BASE_MOVE_LEFT 0xC6
+#define VAR_HEARTBEAT 0xD1
+#define VAR_FRICTION_WHEEL_START 0xDE
+#define VAR_TEST_VAR_U16 0xE6
+#define VAR_BASE_ROTATE_YAW 0xE8
+#define VAR_GRIPPER_GRASP 0xEE
+
+// Fixed sizes (only for fixed-width variables); others are variable-length per TLV L
+#define VAR_FRICTION_WHEEL_SPEED_SIZE 4
+#define VAR_DART_BACKWARD_SIZE 1
+#define VAR_GRIPPER_RELEASE_SIZE 1
+#define VAR_GRIPPER_TAG_Y_SIZE 4
+#define VAR_BASE_MOVE_FORWARD_SIZE 4
+#define VAR_TEST_VAR_F32_SIZE 4
+#define VAR_TEST_VAR_U8_SIZE 1
+#define VAR_GRIPPER_TAG_X_SIZE 4
+#define VAR_DATA_ERROR_SIZE 1
+#define VAR_BASE_STOP_SIZE 1
+#define VAR_DART_LAUNCH_SIZE 1
+#define VAR_FRICTION_WHEEL_STOP_SIZE 1
+#define VAR_GRIPPER_TAG_Z_SIZE 4
+#define VAR_BASE_MOVE_LEFT_SIZE 4
+#define VAR_HEARTBEAT_SIZE 1
+#define VAR_FRICTION_WHEEL_START_SIZE 1
+#define VAR_TEST_VAR_U16_SIZE 2
+#define VAR_BASE_ROTATE_YAW_SIZE 4
+#define VAR_GRIPPER_GRASP_SIZE 1
+
+static const uint8_t VAR_SIZE_TABLE[256] = {
+    [VAR_FRICTION_WHEEL_SPEED] = 4,
+    [VAR_DART_BACKWARD] = 1,
+    [VAR_GRIPPER_RELEASE] = 1,
+    [VAR_GRIPPER_TAG_Y] = 4,
+    [VAR_BASE_MOVE_FORWARD] = 4,
+    [VAR_TEST_VAR_F32] = 4,
+    [VAR_TEST_VAR_U8] = 1,
+    [VAR_GRIPPER_TAG_X] = 4,
+    [VAR_DATA_ERROR] = 1,
+    [VAR_BASE_STOP] = 1,
+    [VAR_DART_LAUNCH] = 1,
+    [VAR_FRICTION_WHEEL_STOP] = 1,
+    [VAR_GRIPPER_TAG_Z] = 4,
+    [VAR_BASE_MOVE_LEFT] = 4,
+    [VAR_HEARTBEAT] = 1,
+    [VAR_FRICTION_WHEEL_START] = 1,
+    [VAR_TEST_VAR_U16] = 2,
+    [VAR_BASE_ROTATE_YAW] = 4,
+    [VAR_GRIPPER_GRASP] = 1,
+    // others default to 0 (variable-length)
+};
+

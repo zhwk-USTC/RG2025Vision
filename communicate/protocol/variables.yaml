@@ -8,10 +8,10 @@ variables:
     vtype: F32
 
   # --- 通用命令相关 ---
-  - name: SEQ       # 命令序号（递增）
-    vtype: U16
-  - name: ACK       # 命令确认（收到后回传）
-    vtype: U16
+  - name: DATA_ERROR     # 错误代码
+    vtype: U8
+  - name: HEARTBEAT      # 心跳包
+    vtype: U8
 
   # --- 底盘移动相关 ---
   - name: base_move_forward       # 向前移动, 单位：m
@@ -20,6 +20,8 @@ variables:
     vtype: F32
   - name: base_rotate_yaw         # 逆时针旋转, 单位：rad
     vtype: F32
+  - name: base_stop               # 停止移动, True表示停止
+    vtype: BOOL
 
   # --- 机械臂相关 ---
   - name: gripper_tag_x   # tag相对机械爪的x, 单位：m

@@ -133,7 +133,9 @@ def render_localization_block(key: str, timers: dict, parent=None):
                         return None
                     # 选最近
                     def dist_of(d):
-                        t = getattr(d, 'pose_t', None) or getattr(d, 'tvec', None)
+                        t = getattr(d, 'pose_t', None)
+                        if t is None:
+                            t = getattr(d, 'tvec', None)
                         if t is None:
                             return float('inf')
                         arr = np.asarray(t, float).reshape(-1)
@@ -174,7 +176,14 @@ def render_localization_block(key: str, timers: dict, parent=None):
                     detection_result_widget.set_content('检测结果：\n' + (det_text or ''))
 
                     if pose is not None:
-                        pose_text = f"x={pose.x:.3f} m\ny={pose.y:.3f} m\nyaw={pose.yaw:.3f} rad ({_deg(pose.yaw):.1f}°)"
+                        pose_text = (
+                            f"x={pose.x:.3f} m\n"
+                            f"y={pose.y:.3f} m\n"
+                            f"z={pose.z:.3f} m\n"
+                            f"roll={pose.roll:.3f} rad ({_deg(pose.roll):.1f}°)\n"
+                            f"pitch={pose.pitch:.3f} rad ({_deg(pose.pitch):.1f}°)\n"
+                            f"yaw={pose.yaw:.3f} rad ({_deg(pose.yaw):.1f}°)"
+                        )
                     else:
                         pose_text = "(无有效定位)"
                     pose_widget.set_content('定位结果：\n' + pose_text)
@@ -211,3 +220,12 @@ def render_localization_block(key: str, timers: dict, parent=None):
                     status_widget = ui.code((cam.get_status() if cam else '')).props('readonly dense').classes('w-64')
                     detection_result_widget = ui.code('').props('readonly dense').classes('w-64')
                     pose_widget = ui.code('').props('readonly dense').classes('w-64')
+
+                with ui.column().classes('q-gutter-xs'):
+                    ui.label('摄像头内参').classes('text-caption')
+                    intrinsics = vs.get_camera_intrinsics(key) # type: ignore
+                    if intrinsics:
+                        intrin_text = f"fx={getattr(intrinsics, 'fx', None)}\nfy={getattr(intrinsics, 'fy', None)}\ncx={getattr(intrinsics, 'cx', None)}\ncy={getattr(intrinsics, 'cy', None)}"
+                    else:
+                        intrin_text = "(无内参信息)"
+                    ui.code(intrin_text).props('readonly dense').classes('w-64')

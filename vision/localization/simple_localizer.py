@@ -118,8 +118,12 @@ class SingleTagLocalizer:
         if det is None:
             return None
 
-        R_or_r = getattr(det, "pose_R", None) or getattr(det, "rvec", None)
-        t      = getattr(det, "pose_t", None) or getattr(det, "tvec", None)
+        R_or_r = getattr(det, "pose_R", None)
+        if R_or_r is None:
+            R_or_r = getattr(det, "rvec", None)
+        t = getattr(det, "pose_t", None)
+        if t is None:
+            t = getattr(det, "tvec", None)
         if R_or_r is None or t is None:
             return None
 

@@ -250,7 +250,8 @@ def gen_c_header(vars_list: List[Tuple[str, str, str]]) -> str:
     lines: List[str] = []
     lines.append("// Auto-generated. DO NOT EDIT MANUALLY.")
     lines.append(f"// Generated at UTC {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append("#pragma once")
+    lines.append("#ifndef PROTOCOL_DEFS_H")
+    lines.append("#define PROTOCOL_DEFS_H")
     lines.append("#include <stdint.h>")
     lines.append("")
     lines.append(f"#define PROTOCOL_DATA_VER_FULL  {full_ver}ULL")
@@ -274,6 +275,8 @@ def gen_c_header(vars_list: List[Tuple[str, str, str]]) -> str:
         lines.append(f"    [VAR_{enum_name}] = {size},")
     lines.append("    // others default to 0 (variable-length)")
     lines.append("};")
+    lines.append("")
+    lines.append("#endif // PROTOCOL_DEFS_H")
     lines.append("")
     return "\n".join(lines) + "\n"
 

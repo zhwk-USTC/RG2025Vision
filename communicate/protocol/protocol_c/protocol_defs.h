@@ -1,10 +1,11 @@
 // Auto-generated. DO NOT EDIT MANUALLY.
-// Generated at UTC 2025-09-14 07:13:12
-#pragma once
+// Generated at UTC 2025-09-15 05:06:14
+#ifndef PROTOCOL_DEFS_H
+#define PROTOCOL_DEFS_H
 #include <stdint.h>
 
-#define PROTOCOL_DATA_VER_FULL  20250914071312ULL
-#define PROTOCOL_DATA_VER       0x10
+#define PROTOCOL_DATA_VER_FULL  20250915050614ULL
+#define PROTOCOL_DATA_VER       0x76
 
 // MSG roles
 #define MSG_PC_TO_MCU 0x01
@@ -74,4 +75,6 @@ static const uint8_t VAR_SIZE_TABLE[256] = {
     [VAR_GRIPPER_GRASP] = 1,
     // others default to 0 (variable-length)
 };
+
+#endif // PROTOCOL_DEFS_H
 

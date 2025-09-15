@@ -1,5 +1,5 @@
 # Auto-generated. DO NOT EDIT MANUALLY.
-# Generated at UTC 2025-09-14 07:13:12
+# Generated at UTC 2025-09-15 05:06:14
 # Version policy:
 #   PROTOCOL_DATA_VER_FULL = YYYYMMDDHHMMSS (UTC)
 #   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header
@@ -7,8 +7,8 @@
 from enum import IntEnum
 from typing import Dict, Optional, TypedDict
 
-PROTOCOL_DATA_VER_FULL: int = 20250914071312
-PROTOCOL_DATA_VER: int = 0x10
+PROTOCOL_DATA_VER_FULL: int = 20250915050614
+PROTOCOL_DATA_VER: int = 0x76
 
 class Msg(IntEnum):
     PC_TO_MCU = 0x01

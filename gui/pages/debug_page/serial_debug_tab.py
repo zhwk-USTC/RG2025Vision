@@ -189,107 +189,208 @@ def render_serial_tab() -> None:
 
     ui.separator()
 
-    # ----------------- 接收监视：只读展示 -----------------
-    with ui.card().classes('w-full'):
-        ui.label('接收监视（只读）').classes('text-lg font-semibold')
+    # ----------------- 接收监视和发送控制（两列布局）-----------------
+    with ui.row().classes('w-full gap-6'):
+        # 左列：接收监视
+        with ui.column():
+            with ui.card().classes('w-full'):
+                ui.label('接收监视（只读）').classes('text-lg font-semibold')
 
-        status_label = ui.label('状态：空').classes('text-gray-500')
+                status_label = ui.label('状态：空').classes('text-gray-500')
 
-        with ui.row().classes('w-full'):
-            with ui.column().classes('w-full'):
-                ui.label('完整帧（AA ... 55）').classes('text-sm text-gray-600')
-                frame_area = ui.textarea(value='', placeholder='hex view')\
-                               .props('rows=4 readonly').classes('w-full font-mono text-xs')
-            with ui.column().classes('w-full'):
-                ui.label('DATA 区（十六进制）').classes('text-sm text-gray-600')
-                data_area = ui.textarea(value='', placeholder='hex view')\
-                              .props('rows=4 readonly').classes('w-full font-mono text-xs')
+                with ui.row().classes('w-full'):
+                    with ui.column().classes('w-full'):
+                        ui.label('完整帧（AA ... 55）').classes('text-sm text-gray-600')
+                        frame_area = ui.textarea(value='', placeholder='hex view')\
+                                       .props('rows=4 readonly').classes('w-full font-mono text-xs')
+                    with ui.column().classes('w-full'):
+                        ui.label('DATA 区（十六进制）').classes('text-sm text-gray-600')
+                        data_area = ui.textarea(value='', placeholder='hex view')\
+                                      .props('rows=4 readonly').classes('w-full font-mono text-xs')
 
-        ui.label('DATA 解析（MSG/VER/TLVs）').classes('text-sm text-gray-600')
-        decoded_area = ui.textarea(value='(no data)', placeholder='decoded view')\
-                         .props('rows=6 readonly').classes('w-full font-mono text-xs')
+                ui.label('DATA 解析（MSG/VER/TLVs）').classes('text-sm text-gray-600')
+                decoded_area = ui.textarea(value='(no data)', placeholder='decoded view')\
+                                 .props('rows=6 readonly').classes('w-full font-mono text-xs')
 
-        def clear_view():
-            status_label.set_text('状态：已清空（仅界面）')
-            frame_area.set_value('')
-            data_area.set_value('')
-            decoded_area.set_value('(no data)')
+                def clear_view():
+                    status_label.set_text('状态：已清空（仅界面）')
+                    frame_area.set_value('')
+                    data_area.set_value('')
+                    decoded_area.set_value('(no data)')
 
-        with ui.row().classes('justify-end w-full'):
-            ui.button('清空显示', color='secondary', on_click=lambda e: clear_view())
+                with ui.row().classes('justify-end w-full'):
+                    ui.button('清空显示', color='secondary', on_click=lambda e: clear_view())
 
-        async def refresh_view():
-            try:
-                frame_bytes, data_bytes, decoded = get_latest_frame()
-                if frame_bytes:
-                    status_label.set_text(
-                        f'状态：已接收 | frame={len(frame_bytes)}B | data={len(data_bytes)}B'
-                    )
-                    frame_area.set_value(_hex(frame_bytes))
-                    data_area.set_value(_hex(data_bytes))
-                    decoded_area.set_value(_fmt_decoded(decoded))
-                else:
-                    status_label.set_text('状态：空')
-            except Exception as e:
-                logger.warning(f'[GUI] 刷新接收监视失败: {e}')
+                async def refresh_view():
+                    try:
+                        frame_bytes, data_bytes, decoded = get_latest_frame()
+                        if frame_bytes:
+                            status_label.set_text(
+                                f'状态：已接收 | frame={len(frame_bytes)}B | data={len(data_bytes)}B'
+                            )
+                            frame_area.set_value(_hex(frame_bytes))
+                            data_area.set_value(_hex(data_bytes))
+                            decoded_area.set_value(_fmt_decoded(decoded))
+                        else:
+                            status_label.set_text('状态：空')
+                    except Exception as e:
+                        logger.warning(f'[GUI] 刷新接收监视失败: {e}')
 
-        ui.timer(0.2, refresh_view)
+                ui.timer(0.1, refresh_view)
 
+        # 右列：发送变量控制
+        with ui.column():
+            with ui.card().classes('w-full'):
+                ui.label('变量发送控制').classes('text-lg font-semibold')
+                
+                # 存储所有变量的输入控件和复选框
+                var_inputs = {}
+                var_checkboxes = {}
+                
+                # 按功能分组变量
+                var_groups = {
+                    "摩擦轮控制": [
+                        ("FRICTION_WHEEL_SPEED", "摩擦轮速度", "F32"),
+                        ("FRICTION_WHEEL_START", "摩擦轮启动", "BOOL"),
+                        ("FRICTION_WHEEL_STOP", "摩擦轮停止", "BOOL"),
+                    ],
+                    "飞镖控制": [
+                        ("DART_LAUNCH", "发射飞镖", "BOOL"),
+                        ("DART_BACKWARD", "飞镖后退", "BOOL"),
+                    ],
+                    "底盘控制": [
+                        ("BASE_MOVE_FORWARD", "前进", "F32"),
+                        ("BASE_MOVE_LEFT", "左移", "F32"),
+                        ("BASE_ROTATE_YAW", "偏航旋转", "F32"),
+                        ("BASE_STOP", "停止", "BOOL"),
+                    ],
+                    "夹爪控制": [
+                        ("GRIPPER_GRASP", "抓取", "BOOL"),
+                        ("GRIPPER_RELEASE", "释放", "BOOL"),
+                        ("GRIPPER_TAG_X", "标签X坐标", "F32"),
+                        ("GRIPPER_TAG_Y", "标签Y坐标", "F32"),
+                        ("GRIPPER_TAG_Z", "标签Z坐标", "F32"),
+                    ],
+                    "系统状态": [
+                        ("HEARTBEAT", "心跳", "U8"),
+                        ("DATA_ERROR", "数据错误", "U8"),
+                    ],
+                    "测试变量": [
+                        ("TEST_VAR_U8", "测试U8", "U8"),
+                        ("TEST_VAR_U16", "测试U16", "U16"),
+                        ("TEST_VAR_F32", "测试F32", "F32"),
+                    ],
+                }
+                
+                # 为每个组创建展开区域
+                for group_name, variables in var_groups.items():
+                    with ui.expansion(group_name, icon='tune').classes('w-full mt-2') as group_expansion:
+                        group_expansion.value = False  # 默认收起
+                        
+                        with ui.column().classes('gap-3 p-3'):
+                            for var_name, display_name, var_type in variables:
+                                # 获取变量的元数据
+                                var_enum = getattr(Var, var_name)
+                                var_meta = VAR_META.get(int(var_enum), {})
+                                var_key = var_meta.get('key', var_name.lower())
+                                
+                                with ui.row().classes('items-center gap-4'):
+                                    # 复选框
+                                    checkbox = ui.checkbox(display_name).props('dense')
+                                    var_checkboxes[var_enum] = checkbox
+                                    
+                                    # 根据类型创建不同的输入控件
+                                    if var_type == "BOOL":
+                                        input_control = ui.checkbox('启用').props('dense')
+                                        input_control.value = False
+                                    elif var_type == "U8":
+                                        input_control = ui.number('值 (0-255)', value=0, min=0, max=255, step=1).classes('w-32')
+                                    elif var_type == "U16":
+                                        input_control = ui.number('值 (0-65535)', value=0, min=0, max=65535, step=1).classes('w-40')
+                                    elif var_type == "F32":
+                                        input_control = ui.number('浮点值', value=0.0, step=0.01).classes('w-40')
+                                    else:
+                                        input_control = ui.input('值').classes('w-40')
+                                        
+                                    var_inputs[var_enum] = input_control
+                                    
+                                    # 单独发送按钮
+                                    def make_send_single(var_enum=var_enum, var_type=var_type, display_name=display_name):
+                                        async def send_single():
+                                            try:
+                                                input_ctrl = var_inputs[var_enum]
+                                                if var_type == "BOOL":
+                                                    value = bool(input_ctrl.value)
+                                                elif var_type in ("U8", "U16"):
+                                                    value = int(input_ctrl.value)
+                                                elif var_type == "F32":
+                                                    value = float(input_ctrl.value)
+                                                else:
+                                                    value = input_ctrl.value
+                                                    
+                                                send_kv({var_enum: value})
+                                                logger.info(f'已发送 {display_name}: {value}')
+                                                ui.notify(f'已发送 {display_name}', type='positive')
+                                            except Exception as e:
+                                                logger.error(f'发送 {display_name} 失败: {e}')
+                                                ui.notify(f'发送失败: {e}', type='negative')
+                                        return send_single
+                                        
+                                    ui.button('发送', color='primary', on_click=make_send_single()).props('size=sm')
+                                    
+                                    # 显示变量信息
+                                    ui.label(f'ID: 0x{int(var_enum):02X}').classes('text-xs text-gray-500')
 
-
-    # ----------------- 发送测试帧（U8 / U16 / F32） -----------------
-    with ui.card().classes('w-full'):
-        ui.label('发送测试帧（可多选变量）').classes('text-lg font-semibold')
-
-        with ui.row().classes('items-center gap-6'):
-            cb_u8 = ui.checkbox('test_var_u8').props('dense')
-            num_u8 = ui.number('U8 值 (0..255)', value=1, min=0, max=255, step=1).classes('w-56')
-
-            cb_u16 = ui.checkbox('test_var_u16').props('dense')
-            num_u16 = ui.number('U16 值 (0..65535)', value=300, min=0, max=65535, step=1).classes('w-56')
-
-            cb_f32 = ui.checkbox('test_var_f32').props('dense')
-            num_f32 = ui.number('F32 值', value=3.14, step=0.01).classes('w-56')
-
-        async def on_send_selected():
-            try:
-                kv = {}
-                if cb_u8.value:
-                    kv[Var.TEST_VAR_U8] = int(num_u8.value) & 0xFF
-                if cb_u16.value:
-                    kv[Var.TEST_VAR_U16] = int(num_u16.value) & 0xFFFF
-                if cb_f32.value:
-                    # 直接传 float；data.py 内部会按 float32 小端打包
-                    kv[Var.TEST_VAR_F32] = float(num_f32.value)
-
-                if not kv:
-                    logger.warning('请先选择至少一个变量')
-                    return
-
-                send_kv(kv)
-                logger.info('测试帧已发送')
-            except Exception as e:
-                logger.warning(f'[GUI] 发送测试帧失败: {e}')
-                logger.error(f'发送失败: {e}')
-
-        with ui.row().classes('items-center gap-3'):
-            ui.button('发送所选', color='accent', on_click=on_send_selected)
-
-            # 快捷按钮：只发某一个变量
-            async def send_only_u8():
-                send_kv({Var.TEST_VAR_U8: int(num_u8.value) & 0xFF})
-                logger.info('已发送: test_var_u8')
-
-            async def send_only_u16():
-                send_kv({Var.TEST_VAR_U16: int(num_u16.value) & 0xFFFF})
-                logger.info('已发送: test_var_u16')
-
-            async def send_only_f32():
-                send_kv({Var.TEST_VAR_F32: float(num_f32.value)})
-                logger.info('已发送: test_var_f32')
-
-            ui.button('只发 U8', on_click=send_only_u8)
-            ui.button('只发 U16', on_click=send_only_u16)
-            ui.button('只发 F32', on_click=send_only_f32)
+                # 批量发送控制
+                ui.separator().classes('my-4')
+                
+                with ui.row().classes('items-center gap-4'):
+                    ui.label('批量操作:').classes('font-bold')
+                    
+                    async def send_selected():
+                        try:
+                            kv = {}
+                            for var_enum, checkbox in var_checkboxes.items():
+                                if checkbox.value:
+                                    input_ctrl = var_inputs[var_enum]
+                                    var_meta = VAR_META.get(int(var_enum), {})
+                                    var_type = var_meta.get('vtype', 'UNKNOWN')
+                                    
+                                    if var_type == "BOOL":
+                                        value = bool(input_ctrl.value)
+                                    elif var_type in ("U8", "U16"):
+                                        value = int(input_ctrl.value)
+                                    elif var_type == "F32":
+                                        value = float(input_ctrl.value)
+                                    else:
+                                        value = input_ctrl.value
+                                        
+                                    kv[var_enum] = value
+                            
+                            if not kv:
+                                ui.notify('请先选择要发送的变量', type='warning')
+                                return
+                            
+                            send_kv(kv)
+                            logger.info(f'批量发送 {len(kv)} 个变量: {list(kv.keys())}')
+                            ui.notify(f'批量发送 {len(kv)} 个变量', type='positive')
+                        except Exception as e:
+                            logger.error(f'批量发送失败: {e}')
+                            ui.notify(f'批量发送失败: {e}', type='negative')
+                    
+                    ui.button('发送选中变量', color='accent', on_click=send_selected).props('icon=send')
+                    
+                    def select_all():
+                        for checkbox in var_checkboxes.values():
+                            checkbox.value = True
+                        ui.notify('已全选', type='info')
+                    
+                    def clear_all():
+                        for checkbox in var_checkboxes.values():
+                            checkbox.value = False
+                        ui.notify('已清空选择', type='info')
+                            
+                    ui.button('全选', color='secondary', on_click=lambda: select_all()).props('size=sm')
+                    ui.button('清空', color='secondary', on_click=lambda: clear_all()).props('size=sm')
 
     ui.separator()

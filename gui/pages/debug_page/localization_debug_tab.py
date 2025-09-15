@@ -56,6 +56,13 @@ def render_localization_tab() -> None:
         with ui.column().classes('items-start'):
             ui.label('Tag36h11 示例').classes('text-subtitle2')
             ui.interactive_image(get_tag36h11_debug_img())
+        with ui.column().classes('items-start'):
+            ui.label('坐标系方向').classes('text-subtitle2')
+            with ui.card().classes('p-4'):
+                ui.label('X轴: 右 →').classes('text-sm')
+                ui.label('Y轴: 下 ↓').classes('text-sm')
+                ui.label('Z轴: 内 ⊗').classes('text-sm')
+                ui.label('(右手坐标系)').classes('text-xs text-gray-500')
     # 相机选择下拉
     cam_keys = list(vs._cameras.keys())
     state = {'cam_key': cam_keys[0] if cam_keys else None}

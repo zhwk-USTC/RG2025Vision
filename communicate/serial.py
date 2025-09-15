@@ -8,7 +8,7 @@ import serial
 class SerialConfig:
     port: str = ''
     baudrate: int = 115200
-    chunk_size: int = 256
+    chunk_size: int = 64  # 减小chunk_size，提高响应速度
 
 class SyncSerial:
     """
@@ -35,6 +35,8 @@ class SyncSerial:
             self._ser = serial.Serial(
                 port=self.cfg.port,
                 baudrate=self.cfg.baudrate,
+                timeout=0.1,  # 设置读超时为100ms，避免无限阻塞
+                write_timeout=1.0,  # 设置写超时为1秒
             )
             return True
         except Exception as e:
@@ -102,15 +104,14 @@ class SyncSerial:
                 with self._lock:
                     ser = self._ser
                 if ser is None or not ser.is_open:
-                    time.sleep(0.02)
+                    time.sleep(0.01)  # 减少空等时间
                     continue
 
-                # 阻塞式读（受 timeout_s 限制），尽量一次取 chunk_size
+                # 阻塞式读（受 timeout 限制），尽量一次取 chunk_size
                 data = ser.read(chunk_size)
                 if not data:
-                    # 超时无数据：让出CPU
-                    time.sleep(0.002)
-                    continue
+                    # 超时无数据：短暂让出CPU，但不要太长
+                    continue  # 直接继续，不需要sleep
 
                 cb = self._callback
                 if cb:
@@ -122,5 +123,5 @@ class SyncSerial:
 
             except Exception:
                 # 轻量容错：短暂休眠再继续
-                time.sleep(0.05)
+                time.sleep(0.01)  # 减少错误恢复时间
                 continue

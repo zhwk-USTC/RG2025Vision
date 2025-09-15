@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 from vision import get_vision
 from vision.camera import Camera
-from vision.detection import Tag36h11Detector, HSVDetector
+from vision.detection import Tag36h11Detector, Tag25h9Detector, HSVDetector
 from core.logger import logger
 
 
@@ -18,15 +18,24 @@ def np_to_pil(img_np):
         return img_np
     return Image.fromarray(img_np.astype('uint8'), 'RGB')
 
+
 def get_tag36h11_debug_img():
     try:
         img = Image.open("assets\\apriltag-imgs\\tag36h11\\tag36_11_00000.png")
-        return img.resize((400, 400), Image.Resampling.NEAREST)
+        return img.resize((300, 300), Image.Resampling.NEAREST)
     except Exception as e:
         logger.warning(f"无法加载调试图片: {e}")
         return get_empty_img()
 
-def get_green_dot_debug_img(size: int = 400, radius: int = 10,
+def get_tag25h9_debug_img():
+    try:
+        img = Image.open("assets\\apriltag-imgs\\tag25h9\\tag25_09_00000.png")
+        return img.resize((300, 300), Image.Resampling.NEAREST)
+    except Exception as e:
+        logger.warning(f"无法加载tag25h9调试图片: {e}")
+        return get_empty_img()
+
+def get_green_dot_debug_img(size: int = 300, radius: int = 15,
                             color=(0, 255, 0), bg=(0, 0, 0)) -> Image.Image:
     img = Image.new("RGB", (size, size), bg)
     draw = ImageDraw.Draw(img)
@@ -74,10 +83,11 @@ def render_detection_block(key: str, cam: Camera):
             ui.button('断开', color='negative', on_click=on_disconnect_click)
 
             # 检测模式下拉框：不检测 / Tag36h11 / HSV
-            mode_state = {'mode': 'none'}  # none | tag36h11 | hsv
+            mode_state = {'mode': 'none'}  # none | tag36h11 | tag25h9 | hsv
             mode_options = {
                 'none': '不检测',
                 'tag36h11': 'AprilTag 36h11',
+                'tag25h9': 'AprilTag 25h9',
                 'hsv': 'HSV 颜色',
             }
             def on_mode_change(v):
@@ -108,6 +118,11 @@ def render_detection_block(key: str, cam: Camera):
                     dets = vs.detect_tag36h11(raw_img, intrinsics)
                     overlay_img = Tag36h11Detector.draw_overlay(raw_img, dets)
                     result_text = Tag36h11Detector.get_result_text(dets)
+                elif mode_state['mode'] == 'tag25h9':
+                    intrinsics = vs.get_camera_intrinsics(key) # type: ignore
+                    dets = vs.detect_tag25h9(raw_img, intrinsics)
+                    overlay_img = Tag25h9Detector.draw_overlay(raw_img, dets)
+                    result_text = Tag25h9Detector.get_result_text(dets)
                 elif mode_state['mode'] == 'hsv':
                     dets = vs.detect_hsv(raw_img)
                     overlay_img = HSVDetector.draw_overlay(raw_img, dets)
@@ -160,6 +175,9 @@ def render_detection_debug_tab():
         with ui.column().classes('items-start'):
             ui.label('Tag36h11 示例').classes('text-subtitle2')
             ui.interactive_image(get_tag36h11_debug_img())
+        with ui.column().classes('items-start'):
+            ui.label('Tag25h9 示例').classes('text-subtitle2')
+            ui.interactive_image(get_tag25h9_debug_img())
         with ui.column().classes('items-start'):
             ui.label('绿色圆点示例').classes('text-subtitle2')
             ui.interactive_image(get_green_dot_debug_img())

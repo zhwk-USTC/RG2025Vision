@@ -144,3 +144,19 @@ class Tag36h11Detector(AprilTagDetectorBase):
         if config.families != 'tag36h11':
             raise ValueError("Invalid tag family: expected 'tag36h11'")
         super().update_config(config)
+        
+class Tag25h9Detector(AprilTagDetectorBase):
+    """Tag25h9 检测器"""
+
+    def __init__(self, config: Optional[TagDetectionConfig] = None):
+        if config is None:
+            config = TagDetectionConfig(families='tag25h9')
+        if config.families != 'tag25h9':
+            raise ValueError("Invalid tag family: expected 'tag25h9'")
+        super().__init__(config)
+        
+    def update_config(self, config: TagDetectionConfig) -> None:
+        """更新检测器配置"""
+        if config.families != 'tag25h9':
+            raise ValueError("Invalid tag family: expected 'tag25h9'")
+        super().update_config(config)

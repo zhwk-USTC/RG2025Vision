@@ -17,6 +17,7 @@ def render_detection_config_tab():
     with ui.row():
         ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
     render_tag36h11_configs()
+    render_tag25h9_configs()
     render_hsv_configs()
     
 def render_tag36h11_configs():
@@ -261,3 +262,117 @@ def render_hsv_configs():
                     ui.label('0 表示不限制数量').style('color:#888;font-size:13px')
 
         ui.button('应用配置', on_click=on_apply_hsv, color='primary')
+
+# 新增：tag25h9配置卡片
+def render_tag25h9_configs():
+    vs = get_vision()
+    detector = vs._tag25h9_detector
+    tag25h9_config = detector.get_config()
+    # ---- 事件处理 ----
+    def on_quad_decimate(value):
+        tag25h9_config.quad_decimate = float(
+            value) if value is not None else 2.0
+        quad_decimate_value.text = f"{value}"
+
+    def on_quad_sigma(value):
+        tag25h9_config.quad_sigma = float(
+            value) if value is not None else 0.0
+        quad_sigma_value.text = f"{value}"
+
+    def on_decode_sharpening(value):
+        tag25h9_config.decode_sharpening = float(
+            value) if value is not None else 0.25
+        decode_sharpening_value.text = f"{value}"
+
+    def on_nthreads(value):
+        if value is not None:
+            tag25h9_config.nthreads = int(value)
+            nthreads_value.text = f"{value}"
+
+    def on_refine_edges(value):
+        if value is not None:
+            checked = bool(int(value))
+            tag25h9_config.refine_edges = checked
+            refine_edges_value.text = f"{int(checked)}"
+
+    def on_apply_tag25h9():
+        detector.update_config(tag25h9_config)
+        logger.info(f'AprilTag25h9 检测器配置已更新')
+    # ---- 头部显示的可变状态 ----
+    header_state = {'text': ''}
+
+    def _header_text() -> str:
+        return 'tag25h9'
+
+    def _refresh_header():
+        header_state['text'] = _header_text()
+
+    # ---- 可展开的元素 ----
+    _refresh_header()
+    with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
+        # 自定义 header（图标 + 动态标题）
+        with exp.add_slot('header'):
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('qr_code')
+                ui.label().bind_text_from(header_state, 'text')
+        ui.label('Tag25h9 检测器配置').classes('text-h5')
+        with ui.card():
+            ui.label('tag25h9参数').classes('text-h6')
+            # 每行一个参数，label-滑条-数值，并加中文注释说明作用
+            with ui.column().classes('q-gutter-xs'):
+                with ui.row().classes('items-center q-gutter-md'):
+                    # quad_decimate：图像下采样倍数，越大速度越快但精度下降，推荐1.0~2.0
+                    ui.label('quad_decimate').style('min-width:110px')
+                    quad_decimate_input = ui.slider(
+                        value=tag25h9_config.quad_decimate, min=1.0, max=4.0, step=0.1,
+                        on_change=lambda e: on_quad_decimate(e.value)).style(
+                        'min-width:240px;max-width:400px;flex:1')
+                    quad_decimate_value = ui.label(f"{tag25h9_config.quad_decimate}").style(
+                        'min-width:48px;text-align:right')
+                    ui.label('图像下采样倍数，越大速度越快但精度下降').style(
+                        'color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    # quad_sigma：高斯模糊参数，抑制噪声，0为不模糊
+                    ui.label('quad_sigma').style('min-width:110px')
+                    quad_sigma_input = ui.slider(
+                        value=tag25h9_config.quad_sigma, min=0.0, max=2.0, step=0.1,
+                        on_change=lambda e: on_quad_sigma(e.value)).style(
+                        'min-width:240px;max-width:400px;flex:1')
+                    quad_sigma_value = ui.label(f"{tag25h9_config.quad_sigma}").style(
+                        'min-width:48px;text-align:right')
+                    ui.label('高斯模糊参数，抑制噪声，0为不模糊').style(
+                        'color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    # decode_sharpening：解码锐化参数，提升边缘清晰度
+                    ui.label('decode_sharpening').style('min-width:110px')
+                    decode_sharpening_input = ui.slider(
+                        value=tag25h9_config.decode_sharpening, min=0.0, max=1.0, step=0.1,
+                        on_change=lambda e: on_decode_sharpening(e.value)
+                        ).style(
+                        'min-width:240px;max-width:400px;flex:1')
+                    decode_sharpening_value = ui.label(f"{tag25h9_config.decode_sharpening}").style(
+                        'min-width:48px;text-align:right')
+                    ui.label('解码锐化参数，提升边缘清晰度').style(
+                        'color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    # nthreads：线程数，提升检测速度，推荐与CPU核心数一致
+                    ui.label('nthreads').style('min-width:110px')
+                    nthreads_input = ui.slider(
+                        value=tag25h9_config.nthreads, min=1, max=16, step=1,
+                        on_change=lambda e:on_nthreads(e.value)).style(
+                        'min-width:240px;max-width:400px;flex:1')
+                    nthreads_value = ui.label(f"{tag25h9_config.nthreads}").style(
+                        'min-width:48px;text-align:right')
+                    ui.label('线程数，提升检测速度，推荐与CPU核心数一致').style(
+                        'color:#888;font-size:13px')
+                with ui.row().classes('items-center q-gutter-md'):
+                    # refine_edges：是否优化边缘检测，提升精度但略慢
+                    ui.label('refine_edges').style('min-width:110px')
+                    refine_edges_input = ui.slider(value=int(bool(tag25h9_config.refine_edges)), min=0, max=1, step=1
+                                                   ,on_change=lambda e:on_refine_edges(e.value)).style(
+                        'min-width:240px;max-width:400px;flex:1')
+                    refine_edges_value = ui.label(f"{int(bool(tag25h9_config.refine_edges))}").style(
+                        'min-width:48px;text-align:right')
+                    ui.label('是否优化边缘检测，提升精度但略慢').style('color:#888;font-size:13px')
+
+            ui.button('应用配置', on_click=on_apply_tag25h9, color='primary')

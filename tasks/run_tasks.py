@@ -6,8 +6,7 @@ from .steps.step_11_nav_center import Step11NavCenter
 from .steps.step_12_align_stand import Step12AlignStand
 from .steps.step_21_align_base import Step21AlignBase
 from .steps.step_22_align_arm import Step22AlignArm
-from .steps.step_23_grasp import Step23Grasp
-from .steps.step_24_load import Step24Load
+from .steps.step_23_grasp_load import Step23GraspLoad
 from .steps.step_31_move_fire import Step31MoveFire
 from .steps.step_32_fire import Step32Fire
 from .steps.step_99_cleanup import Step999Cleanup
@@ -22,8 +21,7 @@ _STEP_CLASSES = {
     "Step12AlignStand": Step12AlignStand,
     "Step21AlignBase": Step21AlignBase,
     "Step22AlignArm": Step22AlignArm,
-    "Step23Grasp": Step23Grasp,
-    "Step24Load": Step24Load,
+    "Step23GraspLoad": Step23GraspLoad,
     "Step31MoveFire": Step31MoveFire,
     "Step32Fire": Step32Fire,
 }
@@ -31,7 +29,7 @@ _STEP_CLASSES = {
 # 步骤组定义
 _STEP_GROUPS = {
     "step1": ["Step11NavCenter", "Step12AlignStand"],
-    "step2": ["Step21AlignBase", "Step22AlignArm", "Step23Grasp", "Step24Load"],
+    "step2": ["Step21AlignBase", "Step22AlignArm", "Step23GraspLoad"],
     "step3": ["Step31MoveFire", "Step32Fire"]
 }
 

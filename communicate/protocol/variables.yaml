@@ -14,16 +14,30 @@ variables:
     vtype: U8
 
   # --- 底盘移动相关 ---
-  - name: base_move_forward       # 向前移动
-    vtype: F32
-  - name: base_move_backward      # 向后移动
-    vtype: F32
-  - name: base_move_left          # 向左移动
-    vtype: F32
-  - name: base_move_right         # 向右移动
-    vtype: F32
-  - name: base_rotate_yaw         # 逆时针旋转, 单位：rad
-    vtype: F32
+  - name: base_move_forward_fast       # 向前移动
+    vtype: BOOL
+  - name: base_move_forward_slow       # 慢速向前移动
+    vtype: BOOL
+  - name: base_move_backward_fast      # 快速向后移动
+    vtype: BOOL
+  - name: base_move_backward_slow      # 慢速向后移动
+    vtype: BOOL
+  - name: base_move_left_fast          # 快速向左移动
+    vtype: BOOL
+  - name: base_move_left_slow          # 慢速向左移动
+    vtype: BOOL
+  - name: base_move_right_fast         # 快速向右移动
+    vtype: BOOL
+  - name: base_move_right_slow         # 慢速向右移动
+    vtype: BOOL
+  - name: base_rotate_CCW_fast         # 逆时针旋转, 单位：rad
+    vtype: BOOL
+  - name: base_rotate_CCW_slow         # 慢速逆时针旋
+    vtype: BOOL
+  - name: base_rotate_CW_fast          # 顺时针旋转, 单位
+    vtype: BOOL
+  - name: base_rotate_CW_slow          # 慢速顺时针旋转
+    vtype: BOOL
   - name: base_stop               # 停止移动, True表示停止
     vtype: BOOL
 
@@ -47,9 +61,14 @@ variables:
     vtype: BOOL
   - name: dart_push_stop             # 停止推进飞镖
     vtype: BOOL
+
   - name: friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
     vtype: BOOL
-  - name: friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮
+  - name: friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮  
     vtype: BOOL
   - name: friction_wheel_speed  # 摩擦轮速度，单位：m/s
+    vtype: F32
+    
+  # --- 炮台相关 ---
+  - name: turret_angle_yaw      # 炮台偏航角度，-1到1之间
     vtype: F32

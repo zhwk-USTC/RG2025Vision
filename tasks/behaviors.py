@@ -1,75 +1,58 @@
 
-from communicate import Var, send_kv, get_latest_decoded
+from communicate import Var, send_kv
 import time
-_seq = 0
+from time import sleep
+from typing import Literal
 
-def wait_for_ack(seq):
-    while True:
-        latest_data = get_latest_decoded()
-        if latest_data is None:
-            time.sleep(0.01)
-            continue
-        found_ack = False
-        for tlv in latest_data.tlvs:
-            if tlv.t == Var.ACK:
-                ack_value = int.from_bytes(tlv.v, 'little')
-                if ack_value == seq:
-                    found_ack = True
-                    break
-        if found_ack:
-            break
-        time.sleep(0.01)
 
-def base_move(forward: float, left: float, wait_ack: bool = False):
-    global _seq
-    send_kv({Var.BASE_MOVE_FORWARD: forward, Var.BASE_MOVE_LEFT: left, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
+def base_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'backward_slow', 'left_fast', 'left_slow', 'right_fast', 'right_slow']):
+    match dir:
+        case 'forward_fast':
+            send_kv({Var.BASE_MOVE_FORWARD_FAST: True})
+        case 'forward_slow':
+            send_kv({Var.BASE_MOVE_FORWARD_SLOW: True})
+        case 'backward_fast':
+            send_kv({Var.BASE_MOVE_BACKWARD_FAST: True})
+        case 'backward_slow':
+            send_kv({Var.BASE_MOVE_BACKWARD_SLOW: True})
+        case 'left_fast':
+            send_kv({Var.BASE_MOVE_LEFT_FAST: True})
+        case 'left_slow':
+            send_kv({Var.BASE_MOVE_LEFT_SLOW: True})
+        case 'right_fast':
+            send_kv({Var.BASE_MOVE_RIGHT_FAST: True})
+        case 'right_slow':
+            send_kv({Var.BASE_MOVE_RIGHT_SLOW: True})
+            
+def base_stop():
+    send_kv({Var.BASE_STOP: True})
 
-def base_rotate(yaw: float, wait_ack: bool = False):
-    global _seq
-    send_kv({Var.BASE_ROTATE_YAW: yaw, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
-
-def send_gripper_tag_pos(x: float, y: float, z: float, wait_ack: bool = False):
-    global _seq
-    send_kv({Var.GRIPPER_TAG_X: x, Var.GRIPPER_TAG_Y: y, Var.GRIPPER_TAG_Z: z, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
-
-def gripper_grasp(wait_ack: bool = False):
-    global _seq
-    send_kv({Var.GRIPPER_GRASP: True, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
-
-def gripper_release(wait_ack: bool = False):
-    global _seq
-    send_kv({Var.GRIPPER_RELEASE: True, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
-
-def set_fire_speed(speed: float, wait_ack: bool = False):
-    global _seq
-    send_kv({Var.FRICTION_WHEEL_SPEED: speed, Var.SEQ: _seq})
-    if wait_ack:
-        wait_for_ack(_seq)
-    _seq += 1
-
-def fire_once():
-    global _seq
-    send_kv({Var.FRICTION_WHEEL_START: True, Var.SEQ: _seq})
-    send_kv({Var.DART_LAUNCH: True, Var.SEQ: _seq})
-    wait_for_ack(_seq)
-    _seq += 1
-    send_kv({Var.FRICTION_WHEEL_STOP: True, Var.SEQ: _seq})
-    send_kv({Var.DART_BACKWARD: True, Var.SEQ: _seq})
-    wait_for_ack(_seq)
-    _seq += 1
+def base_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
+    match dir:
+        case 'cw_fast':
+            send_kv({Var.BASE_ROTATE_CW_FAST: True})
+        case 'cw_slow':
+            send_kv({Var.BASE_ROTATE_CW_SLOW: True})
+        case 'ccw_fast':
+            send_kv({Var.BASE_ROTATE_CCW_FAST: True})
+        case 'ccw_slow':
+            send_kv({Var.BASE_ROTATE_CCW_SLOW: True})
     
+
+
+def send_gripper_tag_pos(x: float, y: float, z: float):
+    send_kv({Var.GRIPPER_TAG_X: x, Var.GRIPPER_TAG_Y: y,
+            Var.GRIPPER_TAG_Z: z})
+
+
+def gripper_grasp():
+    send_kv({Var.GRIPPER_GRASP: True})
+
+
+def gripper_release():
+    send_kv({Var.GRIPPER_RELEASE: True})
+
+    
+def set_fire_speed(speed: float):
+    send_kv({Var.FRICTION_WHEEL_SPEED: speed})
+

@@ -1,11 +1,11 @@
 # tasks/step_1_1_align_center.py
-from time import sleep
+import time
 from core.logger import logger
-from ..behaviors import base_move
+from ..behaviors import base_move, base_stop
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
-MOVE_FORWARD_M = 1.0
-MOVE_LEFT_M = 1.0
+MOVE_FORWARD_TIME = 1.0
+MOVE_LEFT_TIME = 1.0
 
 class Step11NavCenter:
     """
@@ -15,8 +15,8 @@ class Step11NavCenter:
 
     def __init__(
         self,
-        move_forward: float = MOVE_FORWARD_M,      # m
-        move_left: float = MOVE_LEFT_M,         # m
+        move_forward: float = MOVE_FORWARD_TIME,
+        move_left: float = MOVE_LEFT_TIME,
     ) -> None:
         self.move_forward = move_forward
         self.move_left = move_left
@@ -26,10 +26,14 @@ class Step11NavCenter:
             f"[AlignCenter] 开始开环移动"
         )
         try:
-            set_debug_var('nav_center_forward', self.move_forward, DebugLevel.INFO, DebugCategory.CONTROL, "设置向前移动距离")
-            set_debug_var('nav_center_left', self.move_left, DebugLevel.INFO, DebugCategory.CONTROL, "设置向左移动距离")
-            base_move(self.move_forward, self.move_left, wait_ack=True)
-            set_debug_var('nav_center_ack', True, DebugLevel.SUCCESS, DebugCategory.STATUS, "移动指令确认完成")
+            set_debug_var('nav_center_forward', self.move_forward, DebugLevel.INFO, DebugCategory.CONTROL, "设置向前移动时间")
+            set_debug_var('nav_center_left', self.move_left, DebugLevel.INFO, DebugCategory.CONTROL, "设置向左移动时间")
+            base_move('forward_fast')
+            time.sleep(self.move_forward)
+            base_stop()
+            time.sleep(0.5)
+            base_move('left_fast')
+            time.sleep(self.move_left)
         except Exception as e:
             logger.error(f"[AlignCenter] 执行异常：{e}")
             set_debug_var('nav_center_error', str(e), DebugLevel.ERROR, DebugCategory.ERROR, "导航到中心区域时发生错误")

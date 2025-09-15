@@ -14,9 +14,13 @@ variables:
     vtype: U8
 
   # --- 底盘移动相关 ---
-  - name: base_move_forward       # 向前移动, 单位：m
+  - name: base_move_forward       # 向前移动
     vtype: F32
-  - name: base_move_left          # 向左移动, 单位：m
+  - name: base_move_backward      # 向后移动
+    vtype: F32
+  - name: base_move_left          # 向左移动
+    vtype: F32
+  - name: base_move_right         # 向右移动
     vtype: F32
   - name: base_rotate_yaw         # 逆时针旋转, 单位：rad
     vtype: F32
@@ -37,9 +41,11 @@ variables:
     vtype: BOOL
 
   # --- 发射相关 ---
-  - name: dart_launch           # 推进飞镖，True表示推进飞镖向前
+  - name: dart_push_forward           # 推进飞镖向前
     vtype: BOOL
-  - name: dart_backward         # 推进飞镖向后，True表示推进飞镖向后运动
+  - name: dart_push_backward         # 推进飞镖向后
+    vtype: BOOL
+  - name: dart_push_stop             # 停止推进飞镖
     vtype: BOOL
   - name: friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
     vtype: BOOL

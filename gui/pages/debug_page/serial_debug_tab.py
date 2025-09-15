@@ -247,99 +247,72 @@ def render_serial_tab() -> None:
                 var_inputs = {}
                 var_checkboxes = {}
                 
-                # 按功能分组变量
-                var_groups = {
-                    "摩擦轮控制": [
-                        ("FRICTION_WHEEL_SPEED", "摩擦轮速度", "F32"),
-                        ("FRICTION_WHEEL_START", "摩擦轮启动", "BOOL"),
-                        ("FRICTION_WHEEL_STOP", "摩擦轮停止", "BOOL"),
-                    ],
-                    "飞镖控制": [
-                        ("DART_LAUNCH", "发射飞镖", "BOOL"),
-                        ("DART_BACKWARD", "飞镖后退", "BOOL"),
-                    ],
-                    "底盘控制": [
-                        ("BASE_MOVE_FORWARD", "前进", "F32"),
-                        ("BASE_MOVE_LEFT", "左移", "F32"),
-                        ("BASE_ROTATE_YAW", "偏航旋转", "F32"),
-                        ("BASE_STOP", "停止", "BOOL"),
-                    ],
-                    "夹爪控制": [
-                        ("GRIPPER_GRASP", "抓取", "BOOL"),
-                        ("GRIPPER_RELEASE", "释放", "BOOL"),
-                        ("GRIPPER_TAG_X", "标签X坐标", "F32"),
-                        ("GRIPPER_TAG_Y", "标签Y坐标", "F32"),
-                        ("GRIPPER_TAG_Z", "标签Z坐标", "F32"),
-                    ],
-                    "系统状态": [
-                        ("HEARTBEAT", "心跳", "U8"),
-                        ("DATA_ERROR", "数据错误", "U8"),
-                    ],
-                    "测试变量": [
-                        ("TEST_VAR_U8", "测试U8", "U8"),
-                        ("TEST_VAR_U16", "测试U16", "U16"),
-                        ("TEST_VAR_F32", "测试F32", "F32"),
-                    ],
-                }
+                # 从protocol_defs获取所有变量，按名称排序
+                all_vars = []
+                for var_enum in Var:
+                    var_meta = VAR_META.get(int(var_enum), {})
+                    var_name = var_enum.name
+                    var_type = var_meta.get('vtype', 'UNKNOWN')
+                    all_vars.append((var_name, var_type, var_enum))
                 
-                # 为每个组创建展开区域
-                for group_name, variables in var_groups.items():
-                    with ui.expansion(group_name, icon='tune').classes('w-full mt-2') as group_expansion:
-                        group_expansion.value = False  # 默认收起
+                # 按变量名排序
+                all_vars.sort(key=lambda x: x[0])
+                
+                # 创建单一列表，不再分组
+                with ui.column().classes('gap-2 p-3'):
+                    for var_name, var_type, var_enum in all_vars:
+                        # 获取变量的元数据
+                        var_meta = VAR_META.get(int(var_enum), {})
+                        var_key = var_meta.get('key', var_name.lower())
                         
-                        with ui.column().classes('gap-3 p-3'):
-                            for var_name, display_name, var_type in variables:
-                                # 获取变量的元数据
-                                var_enum = getattr(Var, var_name)
-                                var_meta = VAR_META.get(int(var_enum), {})
-                                var_key = var_meta.get('key', var_name.lower())
+                        with ui.row().classes('items-center gap-4'):
+                            # 复选框
+                            checkbox = ui.checkbox(var_name).props('dense')
+                            var_checkboxes[var_enum] = checkbox
+                            
+                            # 根据类型创建不同的输入控件
+                            if var_type == "BOOL":
+                                # input_control = ui.checkbox('BOOL').props('dense')
+                                # input_control.value = False
+                                input_control = None
+                            elif var_type == "U8":
+                                input_control = ui.number('值 (0-255)', value=0, min=0, max=255, step=1).classes('w-32')
+                            elif var_type == "U16":
+                                input_control = ui.number('值 (0-65535)', value=0, min=0, max=65535, step=1).classes('w-40')
+                            elif var_type == "F32":
+                                input_control = ui.number('浮点值', value=0.0, step=0.01).classes('w-40')
+                            else:
+                                input_control = ui.input('值').classes('w-40')
                                 
-                                with ui.row().classes('items-center gap-4'):
-                                    # 复选框
-                                    checkbox = ui.checkbox(display_name).props('dense')
-                                    var_checkboxes[var_enum] = checkbox
-                                    
-                                    # 根据类型创建不同的输入控件
-                                    if var_type == "BOOL":
-                                        input_control = ui.checkbox('启用').props('dense')
-                                        input_control.value = False
-                                    elif var_type == "U8":
-                                        input_control = ui.number('值 (0-255)', value=0, min=0, max=255, step=1).classes('w-32')
-                                    elif var_type == "U16":
-                                        input_control = ui.number('值 (0-65535)', value=0, min=0, max=65535, step=1).classes('w-40')
-                                    elif var_type == "F32":
-                                        input_control = ui.number('浮点值', value=0.0, step=0.01).classes('w-40')
-                                    else:
-                                        input_control = ui.input('值').classes('w-40')
-                                        
-                                    var_inputs[var_enum] = input_control
-                                    
-                                    # 单独发送按钮
-                                    def make_send_single(var_enum=var_enum, var_type=var_type, display_name=display_name):
-                                        async def send_single():
-                                            try:
-                                                input_ctrl = var_inputs[var_enum]
-                                                if var_type == "BOOL":
-                                                    value = bool(input_ctrl.value)
-                                                elif var_type in ("U8", "U16"):
-                                                    value = int(input_ctrl.value)
-                                                elif var_type == "F32":
-                                                    value = float(input_ctrl.value)
-                                                else:
-                                                    value = input_ctrl.value
-                                                    
-                                                send_kv({var_enum: value})
-                                                logger.info(f'已发送 {display_name}: {value}')
-                                                ui.notify(f'已发送 {display_name}', type='positive')
-                                            except Exception as e:
-                                                logger.error(f'发送 {display_name} 失败: {e}')
-                                                ui.notify(f'发送失败: {e}', type='negative')
-                                        return send_single
-                                        
-                                    ui.button('发送', color='primary', on_click=make_send_single()).props('size=sm')
-                                    
-                                    # 显示变量信息
-                                    ui.label(f'ID: 0x{int(var_enum):02X}').classes('text-xs text-gray-500')
+                            var_inputs[var_enum] = input_control
+                            
+                            # 单独发送按钮
+                            def make_send_single(var_enum=var_enum, var_type=var_type, var_name=var_name):
+                                async def send_single():
+                                    try:
+                                        input_ctrl = var_inputs[var_enum]
+                                        if var_type == "BOOL":
+                                            # value = bool(input_ctrl.value)
+                                            value = True  # BOOL 变量发送时直接设为 True
+                                        elif var_type in ("U8", "U16"):
+                                            value = int(input_ctrl.value)
+                                        elif var_type == "F32":
+                                            value = float(input_ctrl.value)
+                                        else:
+                                            value = input_ctrl.value
+                                            
+                                        send_kv({var_enum: value})
+                                        logger.info(f'已发送 {var_name}: {value}')
+                                        ui.notify(f'已发送 {var_name}', type='positive')
+                                    except Exception as e:
+                                        logger.error(f'发送 {var_name} 失败: {e}')
+                                        ui.notify(f'发送失败: {e}', type='negative')
+                                return send_single
+                                
+                            ui.button('发送', color='primary', on_click=make_send_single()).props('size=sm')
+                            
+                            # 显示变量信息
+                            ui.label(f'ID: 0x{int(var_enum):02X}').classes('text-xs text-gray-500')
 
                 # 批量发送控制
                 ui.separator().classes('my-4')

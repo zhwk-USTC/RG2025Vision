@@ -16,10 +16,23 @@ CameraKey = CAM_KEY_TYPE
 # ---------------------------
 # 控制策略参数（可按实际调参）
 # ---------------------------
+
 # 平移误差阈值：小于该值认为在容差内
-DEFAULT_TOLERANCE_XY = 0.05
+DEFAULT_TOLERANCE_XY = 0.02
 # 角度误差阈值（弧度）
-DEFAULT_TOLERANCE_YAW = 0.1
+DEFAULT_TOLERANCE_YAW = 0.02
+
+# 允许旋转的位移门槛：只有当 |e_x|、|e_y| 都小于该值才会旋转
+ROT_GATE_XY = 0.08  # m
+
+# 单次旋转脉冲时长（秒）
+ROT_PULSE_SEC = 0.20
+
+# 单次平移脉冲时长（秒）
+MOVE_PULSE_SEC = 0.30
+
+# 运动指令执行等待时长（秒）
+MOVE_WAIT_SEC = 0.10
 
 class VisionUtils:
     """视觉相关工具函数"""
@@ -116,8 +129,21 @@ class VisionUtils:
                 time.sleep(retry_delay)
                 continue
 
-            det = dets[0] if target_tag_id is None else next(
-                (d for d in dets if getattr(d, 'tag_id', None) == target_tag_id), dets[0])
+            # 选择目标标签
+            if target_tag_id is None:
+                det = dets[0]  # 未指定ID时选择第一个
+            else:
+                # 指定了ID时，必须找到对应的标签
+                det = next((d for d in dets if getattr(d, 'tag_id', None) == target_tag_id), None)
+                if det is None:
+                    if iter_cnt >= max_retries:
+                        logger.error(f"[{debug_description}] 未找到指定ID={target_tag_id}的标签")
+                        set_debug_var(f'{debug_prefix}_error', f'target tag {target_tag_id} not found',
+                                      DebugLevel.ERROR, DebugCategory.DETECTION, f"未找到指定{debug_description}ID={target_tag_id}")
+                        return None, None
+                    iter_cnt += 1
+                    time.sleep(retry_delay)
+                    continue
             set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
                           DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
 
@@ -136,47 +162,62 @@ class VisionUtils:
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
-    # 如果发现旋转方向相反，把这个设为 -1
-    YAW_SIGN = +1
+    YAW_SIGN: int = +1
+
+    # 内部状态：用于旋转的滞回与效果监测
+    _rotating: bool = False
+    _last_yaw_mag: float | None = None
+    _no_improve_cnt: int = 0
+    
+    # 自适应旋转控制：记录上一次的角度误差，检测是否在发散
+    _last_e_yaw: float | None = None
+    _consecutive_same_direction: int = 0
+    _max_consecutive_same_direction: int = 5  # 连续同方向旋转次数阈值
     
     @staticmethod
     def calculate_position_error(pose, target_z: float, target_x: float = 0.0, target_yaw: float = 0.0) -> Tuple[float, float, float]:
         """
-        计算位置误差（摄像头在机器人左侧）
-        
-        坐标系说明：
-        - pose.x: tag右侧为正（相机在tag右侧时为正值）  
-        - pose.z: tag内侧为正（通常为负数，相机在tag外侧）
-        - target_z: 期望距离（正数）
-        
-        机器人运动映射：
-        - 要靠近tag：向左移动（减小距离）
-        - 要远离tag：向右移动（增大距离）
-        - 前后移动：调整机器人与tag的前后位置关系
-        
-        Args:
-            pose: 检测到的tag位姿
-            target_z: 期望距离（正数，如0.5米）
-            target_x: 相对tag坐标系的目标x位置（右为正）
-            target_yaw: 相对tag坐标系的目标偏航角（弧度）
-            
-        Returns:
-            (e_x, e_y, e_yaw): 前后误差、左右误差、偏航误差
+        计算位置误差（相机系：x右、y下、z里）
+        e_x: 前后距离误差（用 z）
+        e_y: 左右误差（左正，取 -x）
+        e_yaw: 平面朝向误差 —— 注意此处使用 pose.pitch 作为“平面yaw”
         """
-            
-        # 左右误差：控制机器人与tag的距离
-        # pose.z通常为负数，|pose.z|是实际距离
+        # 距离误差：以 z 表示前向距离
         actual_distance = abs(float(pose.z))
-        e_x = actual_distance - target_z  # e_x > 0表示太远，需要向左移动；e_x < 0表示太近，需要向右移动
+        e_x = actual_distance - float(target_z)
 
-        # 前后误差：控制机器人相对tag的前后位置
-        # pose.x > 0表示相机在tag右侧，机器人需要向前移动
-        # pose.x < 0表示相机在tag左侧，机器人需要向后移动  
-        e_y = float(pose.x) - float(target_x)  # e_y > 0表示需要向前，e_y < 0表示需要向后
+        # 侧向误差：左正 → -x
+        e_y = -float(getattr(pose, 'x', 0.0)) - 0.0  # target_x 若用于其它任务，可在此叠加
 
-        # 偏航：相对目标偏航角的误差
-        raw_yaw = float(pose.yaw)
-        e_yaw = AlignmentUtils.YAW_SIGN * (raw_yaw - target_yaw)
+        # ====== 关键修正：把 pitch 作为“平面上的 yaw” ======
+        raw_yaw = None
+        if hasattr(pose, 'pitch') and pose.pitch is not None:
+            raw_yaw = float(pose.pitch)
+            yaw_source = 'pitch'
+        else:
+            # 兼容：若暂时没有 pitch 字段，回退到旧的 yaw 字段
+            raw_yaw = float(getattr(pose, 'yaw', 0.0))
+            yaw_source = 'yaw(fallback)'
+
+        # 与目标朝向（target_yaw）之差，并规范到 [-pi, pi]
+        import math
+        yaw_diff = raw_yaw - float(target_yaw)
+        yaw_diff_before_norm = yaw_diff
+        while yaw_diff > math.pi:
+            yaw_diff -= 2 * math.pi
+        while yaw_diff < -math.pi:
+            yaw_diff += 2 * math.pi
+
+        e_yaw = AlignmentUtils.YAW_SIGN * yaw_diff
+
+        # 调试输出
+        set_debug_var('yaw_calc_source', yaw_source, DebugLevel.INFO, DebugCategory.POSITION, "用于平面朝向的字段")
+        set_debug_var('yaw_calc_raw', round(raw_yaw, 3), DebugLevel.INFO, DebugCategory.POSITION, f"原始角度({yaw_source})")
+        set_debug_var('yaw_calc_target', round(float(target_yaw), 3), DebugLevel.INFO, DebugCategory.POSITION, "目标yaw角度")
+        set_debug_var('yaw_calc_diff_before', round(yaw_diff_before_norm, 3), DebugLevel.INFO, DebugCategory.POSITION, "标准化前差值")
+        set_debug_var('yaw_calc_diff_after', round(yaw_diff, 3), DebugLevel.INFO, DebugCategory.POSITION, "标准化后差值")
+        set_debug_var('yaw_calc_sign', AlignmentUtils.YAW_SIGN, DebugLevel.INFO, DebugCategory.POSITION, "YAW_SIGN")
+        set_debug_var('yaw_calc_final', round(e_yaw, 3), DebugLevel.INFO, DebugCategory.POSITION, "最终误差e_yaw")
 
         return e_x, e_y, e_yaw
 
@@ -209,24 +250,26 @@ class AlignmentUtils:
                 base_move('left_slow')     # 太远了 → 向左靠近
             else:
                 base_move('right_slow')    # 太近了 → 向右远离
-            return
-
-        if ay > 0:
-            # 纠正前后位置误差
+        elif ay > 0:
             if e_y > 0:
-                base_move('forward_slow')  # 需要向前
+                base_move('backward_slow')
             else:
-                base_move('backward_slow') # 需要向后
+                base_move('forward_slow')
+        else:
+            # 误差很小，直接停止
+            base_stop()
             return
-
+        
+        # 运动一段时间后停止
+        time.sleep(MOVE_PULSE_SEC)  # 给足够时间让机器人真正移动
         base_stop()
 
 
     @staticmethod
     def _rotate_discrete(e_yaw: float) -> None:
         """
-        根据 e_yaw 误差发出一次“旋转”离散指令。
-        只使用 slow 档。
+        极简旋转：角度误差超出容差就打一发慢速脉冲，然后停止。
+        不做滞回/状态机。
         """
         ayaw = abs(e_yaw)
         if ayaw <= DEFAULT_TOLERANCE_YAW:
@@ -236,19 +279,34 @@ class AlignmentUtils:
             base_rotate('ccw_slow')
         else:
             base_rotate('cw_slow')
-            
-        # 离散控制模式：发出指令后立即停止
+
+        time.sleep(ROT_PULSE_SEC)  # 短脉冲
         base_stop()
 
     @staticmethod
-    def execute_alignment_move(e_x: float, e_y: float, e_yaw: float, rotation_threshold: float = 0.05):
+    def execute_alignment_move(e_x: float, e_y: float, e_yaw: float):
         """
-        执行对齐移动：优先处理旋转（若超阈值），否则处理平移。
+        简化调度：
+        - 只要线性误差超过容差，就做一次平移微调（slow 脉冲）
+        - 仅当两轴线性误差都很小且角度超容差时才旋转
+        - 其余情况停止
         """
-        if abs(e_yaw) > rotation_threshold:
-            AlignmentUtils._rotate_discrete(e_yaw)
-        else:
+        rot_thr = DEFAULT_TOLERANCE_YAW
+
+        linear_err = max(abs(e_x), abs(e_y))
+
+        # 1) 线性误差优先：超过线性容差就平移（无视 ROT_GATE_XY）
+        if linear_err > DEFAULT_TOLERANCE_XY:
             AlignmentUtils._move_discrete(e_x, e_y)
+            return
+
+        # 2) 线性很小，再看角度：仅在两轴都 ≤ ROT_GATE_XY 且角度超容差时旋转
+        if abs(e_x) <= ROT_GATE_XY and abs(e_y) <= ROT_GATE_XY and abs(e_yaw) > rot_thr:
+            AlignmentUtils._rotate_discrete(e_yaw)
+            return
+
+        # 3) 都在容差附近：停
+        base_stop()
 
     @staticmethod
     def apriltag_alignment_loop(
@@ -284,6 +342,20 @@ class AlignmentUtils:
             e_x, e_y, e_yaw = AlignmentUtils.calculate_position_error(
                 pose, target_z, target_x, target_yaw
             )
+            
+            # 添加详细的调试信息，包括原始pose值
+            yaw_source = 'pitch' if hasattr(pose, 'pitch') and pose.pitch is not None else 'yaw'
+            set_debug_var(
+                f'{debug_prefix}_pose_raw',
+                {
+                    'x': round(float(pose.x), 3),
+                    'z': round(float(pose.z), 3),
+                    'pitch': round(float(getattr(pose, 'pitch', 0.0)), 3),
+                    'yaw': round(float(getattr(pose, 'yaw', 0.0)), 3),
+                    'yaw_used': yaw_source
+                },
+                DebugLevel.INFO, DebugCategory.POSITION, "检测到的原始pose值"
+            )
             set_debug_var(
                 f'{debug_prefix}_err',
                 {'ex': round(e_x, 3), 'ey': round(e_y, 3), 'eyaw': round(e_yaw, 3)},
@@ -300,7 +372,9 @@ class AlignmentUtils:
             AlignmentUtils.execute_alignment_move(e_x, e_y, e_yaw)
             set_debug_var(f'{debug_prefix}_status', 'adjusting',
                           DebugLevel.INFO, DebugCategory.STATUS, f"正在调整位置对齐{task_name}")
-            time.sleep(0.05)
+            
+            # 等待一段时间让运动完成，然后再进行下一次检测
+            time.sleep(MOVE_WAIT_SEC)  # 短暂等待让运动指令完全执行
 
         return True
 
@@ -359,7 +433,7 @@ class CustomDetectionUtils:
                                   DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{task_name}目标")
                     return False
                 iter_cnt += 1
-                time.sleep(0.05)
+                time.sleep(MOVE_WAIT_SEC)  # 检测失败时等待足够时间再重试
                 continue
 
             set_debug_var(f'{debug_prefix}_target_pos', detection_result,
@@ -385,7 +459,9 @@ class CustomDetectionUtils:
             AlignmentUtils.execute_alignment_move(e_x, e_y, e_yaw)
             set_debug_var(f'{debug_prefix}_status', 'adjusting',
                           DebugLevel.INFO, DebugCategory.STATUS, f"正在调整{task_name}位置")
-            time.sleep(0.05)
+            
+            # 等待一段时间让运动完成，然后再进行下一次检测
+            time.sleep(MOVE_WAIT_SEC)  # 短暂等待让运动指令完全执行
 
         return True
 

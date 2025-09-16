@@ -3,7 +3,7 @@ from typing import Optional
 from vision import get_vision
 from core.logger import logger
 from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
-from communicate import Var, send_kv, get_latest_decoded
+from communicate import Var, send_kv, get_latest_decoded, init_serial, start_serial
 
 class Step00Init:
     """
@@ -15,6 +15,24 @@ class Step00Init:
 
     def run(self) -> bool:
         reset_debug_vars()
+        
+        # 初始化并开启串口
+        logger.info("[InitSelfcheck] 初始化串口...")
+        set_debug_var('serial_status', 'initializing', DebugLevel.INFO, DebugCategory.STATUS, "正在初始化串口")
+        
+        try:
+            init_serial()
+            if not start_serial():
+                logger.error("[InitSelfcheck] 串口启动失败")
+                set_debug_var('serial_status', 'start_failed', DebugLevel.ERROR, DebugCategory.STATUS, "串口启动失败")
+                return False
+            
+            logger.info("[InitSelfcheck] 串口启动成功")
+            set_debug_var('serial_status', 'started', DebugLevel.SUCCESS, DebugCategory.STATUS, "串口启动成功")
+        except Exception as e:
+            logger.error(f"[InitSelfcheck] 串口初始化异常: {e}")
+            set_debug_var('serial_status', f'error: {str(e)}', DebugLevel.ERROR, DebugCategory.STATUS, "串口初始化异常")
+            return False
         
         # 与单片机握手
         if not self._handshake_with_mcu():

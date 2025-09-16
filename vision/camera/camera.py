@@ -171,41 +171,41 @@ class Camera:
         # ---- 2) 曝光/增益（先关自动再设值）----
         self._set_exposure_smart()
 
-        # ---- 3) 白平衡（智能设置）----
-        if self._config.auto_wb_off or self._config.wb_temperature is not None:
-            # 需要手动白平衡时，关闭自动白平衡
-            if self._config.auto_wb_off:
-                self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [0, 0.0], "AUTO_WB(关闭)")
-            if self._config.wb_temperature is not None:
-                self._try_set(cv2.CAP_PROP_WB_TEMPERATURE, int(self._config.wb_temperature), "WB_TEMPERATURE")
-        else:
-            # 不使用手动白平衡时，恢复自动白平衡
-            self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [1, 1.0], "AUTO_WB(恢复自动)")
+        # # ---- 3) 白平衡（智能设置）----
+        # if self._config.auto_wb_off or self._config.wb_temperature is not None:
+        #     # 需要手动白平衡时，关闭自动白平衡
+        #     if self._config.auto_wb_off:
+        #         self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [0, 0.0], "AUTO_WB(关闭)")
+        #     if self._config.wb_temperature is not None:
+        #         self._try_set(cv2.CAP_PROP_WB_TEMPERATURE, int(self._config.wb_temperature), "WB_TEMPERATURE")
+        # else:
+        #     # 不使用手动白平衡时，恢复自动白平衡
+        #     self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [1, 1.0], "AUTO_WB(恢复自动)")
 
-        # ---- 4) 对焦（智能设置）----
-        if self._config.autofocus_off or self._config.focus is not None:
-            # 需要手动对焦时，关闭自动对焦
-            if self._config.autofocus_off:
-                self._try_set(cv2.CAP_PROP_AUTOFOCUS, 0, "AUTOFOCUS(关闭)")
-            if self._config.focus is not None:
-                self._try_set(cv2.CAP_PROP_FOCUS, float(self._config.focus), "FOCUS")
-        else:
-            # 不使用手动对焦时，恢复自动对焦
-            self._try_set(cv2.CAP_PROP_AUTOFOCUS, 1, "AUTOFOCUS(恢复自动)")
+        # # ---- 4) 对焦（智能设置）----
+        # if self._config.autofocus_off or self._config.focus is not None:
+        #     # 需要手动对焦时，关闭自动对焦
+        #     if self._config.autofocus_off:
+        #         self._try_set(cv2.CAP_PROP_AUTOFOCUS, 0, "AUTOFOCUS(关闭)")
+        #     if self._config.focus is not None:
+        #         self._try_set(cv2.CAP_PROP_FOCUS, float(self._config.focus), "FOCUS")
+        # else:
+        #     # 不使用手动对焦时，恢复自动对焦
+        #     self._try_set(cv2.CAP_PROP_AUTOFOCUS, 1, "AUTOFOCUS(恢复自动)")
 
-        # ---- 5) 画质类 ----
-        if self._config.brightness is not None:
-            self._try_set(cv2.CAP_PROP_BRIGHTNESS, self._config.brightness, "BRIGHTNESS")
-        if self._config.contrast is not None:
-            self._try_set(cv2.CAP_PROP_CONTRAST, self._config.contrast, "CONTRAST")
-        if self._config.saturation is not None:
-            self._try_set(cv2.CAP_PROP_SATURATION, self._config.saturation, "SATURATION")
-        if self._config.hue is not None:
-            self._try_set(cv2.CAP_PROP_HUE, self._config.hue, "HUE")
-        if self._config.sharpness is not None:
-            self._try_set(cv2.CAP_PROP_SHARPNESS, self._config.sharpness, "SHARPNESS")
-        if self._config.gamma is not None:
-            self._try_set(cv2.CAP_PROP_GAMMA, self._config.gamma, "GAMMA")
+        # # ---- 5) 画质类 ----
+        # if self._config.brightness is not None:
+        #     self._try_set(cv2.CAP_PROP_BRIGHTNESS, self._config.brightness, "BRIGHTNESS")
+        # if self._config.contrast is not None:
+        #     self._try_set(cv2.CAP_PROP_CONTRAST, self._config.contrast, "CONTRAST")
+        # if self._config.saturation is not None:
+        #     self._try_set(cv2.CAP_PROP_SATURATION, self._config.saturation, "SATURATION")
+        # if self._config.hue is not None:
+        #     self._try_set(cv2.CAP_PROP_HUE, self._config.hue, "HUE")
+        # if self._config.sharpness is not None:
+        #     self._try_set(cv2.CAP_PROP_SHARPNESS, self._config.sharpness, "SHARPNESS")
+        # if self._config.gamma is not None:
+        #     self._try_set(cv2.CAP_PROP_GAMMA, self._config.gamma, "GAMMA")
 
         # 回读并更新实际生效的宽高/FPS
         real_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or (self.width or 0)

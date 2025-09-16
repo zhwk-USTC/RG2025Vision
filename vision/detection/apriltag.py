@@ -48,15 +48,30 @@ class AprilTagDetectorBase:
         """进行 AprilTag 检测，并返回结果"""
         if image.ndim == 3:
             image = np.mean(image, axis=2).astype(np.uint8)
+        
         estimated_pose = False
         camera_params = None
+        
+        # 严格检查相机内参的有效性
         if intrinsics and tag_size:
-            estimated_pose = True
-            camera_params = (intrinsics.fx, intrinsics.fy,
-                             intrinsics.cx, intrinsics.cy)
-        result = self.detector.detect(
-            image, estimate_tag_pose=estimated_pose, camera_params=camera_params, tag_size=tag_size)
-        return result
+            # 检查所有必需的内参字段是否存在且不为None
+            if (hasattr(intrinsics, 'fx') and intrinsics.fx is not None and
+                hasattr(intrinsics, 'fy') and intrinsics.fy is not None and
+                hasattr(intrinsics, 'cx') and intrinsics.cx is not None and
+                hasattr(intrinsics, 'cy') and intrinsics.cy is not None):
+                
+                estimated_pose = True
+                camera_params = (intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
+            else:
+                logger.warning("[AprilTagDetector] 相机内参不完整，跳过位姿估计")
+        
+        try:
+            result = self.detector.detect(
+                image, estimate_tag_pose=estimated_pose, camera_params=camera_params, tag_size=tag_size)
+            return result
+        except Exception as e:
+            logger.error(f"[AprilTagDetector] 检测失败: {e}")
+            return None
 
     @staticmethod
     def draw_overlay(img: Optional[np.ndarray], detect_result: Optional[List[Detection]]) -> Optional[np.ndarray]:

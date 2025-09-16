@@ -7,7 +7,4 @@ class Step22AlignArm:
         pass
 
     def run(self) -> bool:
-        x, y, z = 0.1, 0.2, 0.3
-        send_gripper_tag_pos(x, y, z)
-        set_debug_var('align_arm_target', {'x': x, 'y': y, 'z': z}, DebugLevel.INFO, DebugCategory.POSITION, "机械臂目标位置")
         return True

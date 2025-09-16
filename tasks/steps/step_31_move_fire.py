@@ -20,8 +20,9 @@ class Step31MoveFire:
     def run(self) -> bool:
         return align_to_apriltag(
             cam_key=self.cam_key,  # type: ignore
+            target_tag_families='tag36h11',
             target_tag_id=self.tag_id,
-            target_distance=self.keep_dist,
+            target_z=self.keep_dist,
             debug_prefix="firespot_align",
             task_name="MoveToFirespot"
         )

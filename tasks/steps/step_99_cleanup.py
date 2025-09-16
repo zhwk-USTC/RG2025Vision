@@ -26,7 +26,7 @@ class Step999Cleanup:
 
         # 1) 下位机安全停止（先让一切不再运动/发射）
         try:
-            # stop_all()             # 一键急停（若有）
+            base_stop()
             # chassis_stop()
             # stop_flywheel()
             # if self.open_gripper_on_exit:

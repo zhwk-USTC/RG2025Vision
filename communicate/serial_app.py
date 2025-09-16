@@ -80,6 +80,11 @@ def select_serial_port(port: str):
 
 def start_serial() -> bool:
     """打开串口并启动后台接收线程。"""
+    # 如果串口已经开启，直接返回成功
+    if _serial.is_open():
+        logger.info("[Serial] 串口已开启，无需重复开启")
+        return True
+    
     ok = _serial.open()
     if not ok:
         return False

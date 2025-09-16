@@ -60,7 +60,7 @@ class Step999Cleanup:
         set_debug_var('program_exiting', 'program will exit in 10 seconds', DebugLevel.INFO, DebugCategory.STATUS, "程序即将退出")
         logger.info("[Cleanup] 任务清理完成")
         logger.info("10秒后程序退出")
-        time.sleep(10)
+        time.sleep(1)
         reset_debug_vars()
         
         return ok

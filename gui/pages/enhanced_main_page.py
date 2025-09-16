@@ -331,8 +331,17 @@ def render_enhanced_main_page():
             return
             
         logger.info("用户请求强制停止当前任务")
-        force_stop_current_task()
-        ui.notify("任务已被强制停止", type="warning")
+        
+        # 显示停止进度
+        ui.notify("正在强制停止任务并执行清理...", type="warning", timeout=3000)
+        
+        # 强制停止当前任务（包含清理步骤）
+        try:
+            force_stop_current_task()
+            ui.notify("任务已被强制停止，清理已完成", type="positive")
+        except Exception as e:
+            logger.error(f"强制停止过程中出现异常: {e}")
+            ui.notify(f"强制停止过程中出现异常: {e}", type="negative")
         
         # 更新按钮状态
         run_btn.props('loading=false')

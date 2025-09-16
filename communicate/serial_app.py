@@ -83,6 +83,7 @@ def start_serial() -> bool:
     # 如果串口已经开启，直接返回成功
     if _serial.is_open():
         logger.info("[Serial] 串口已开启，无需重复开启")
+        _serial.start_receiving()  # 确保接收线程启动
         return True
     
     ok = _serial.open()

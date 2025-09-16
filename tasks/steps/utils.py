@@ -164,60 +164,30 @@ class AlignmentUtils:
 
     YAW_SIGN: int = +1
 
-    # 内部状态：用于旋转的滞回与效果监测
-    _rotating: bool = False
-    _last_yaw_mag: float | None = None
-    _no_improve_cnt: int = 0
-    
-    # 自适应旋转控制：记录上一次的角度误差，检测是否在发散
-    _last_e_yaw: float | None = None
-    _consecutive_same_direction: int = 0
-    _max_consecutive_same_direction: int = 5  # 连续同方向旋转次数阈值
-    
     @staticmethod
     def calculate_position_error(pose, target_z: float, target_x: float = 0.0, target_yaw: float = 0.0) -> Tuple[float, float, float]:
         """
-        计算位置误差（相机系：x右、y下、z里）
+        计算位置误差（相机系：x左、y上、z外）
         e_x: 前后距离误差（用 z）
         e_y: 左右误差（左正，取 -x）
         e_yaw: 平面朝向误差 —— 注意此处使用 pose.pitch 作为“平面yaw”
         """
-        # 距离误差：以 z 表示前向距离
-        actual_distance = abs(float(pose.z))
-        e_x = actual_distance - float(target_z)
+        # 距离误差
+        actual_distance = float(pose.z)
+        e_x = float(target_z) - float(pose.z)
 
-        # 侧向误差：左正 → -x
-        e_y = -float(getattr(pose, 'x', 0.0)) - 0.0  # target_x 若用于其它任务，可在此叠加
+        # 侧向误差
+        e_y = float(target_x)- float(pose.x)
 
-        # ====== 关键修正：把 pitch 作为“平面上的 yaw” ======
-        raw_yaw = None
-        if hasattr(pose, 'pitch') and pose.pitch is not None:
-            raw_yaw = float(pose.pitch)
-            yaw_source = 'pitch'
-        else:
-            # 兼容：若暂时没有 pitch 字段，回退到旧的 yaw 字段
-            raw_yaw = float(getattr(pose, 'yaw', 0.0))
-            yaw_source = 'yaw(fallback)'
-
-        # 与目标朝向（target_yaw）之差，并规范到 [-pi, pi]
+        # ====== 把 pitch 作为“平面上的 yaw” ======
         import math
-        yaw_diff = raw_yaw - float(target_yaw)
-        yaw_diff_before_norm = yaw_diff
+        yaw_diff = float(target_yaw) - float(pose.pitch)
         while yaw_diff > math.pi:
             yaw_diff -= 2 * math.pi
         while yaw_diff < -math.pi:
             yaw_diff += 2 * math.pi
 
         e_yaw = AlignmentUtils.YAW_SIGN * yaw_diff
-
-        # 调试输出
-        set_debug_var('yaw_calc_source', yaw_source, DebugLevel.INFO, DebugCategory.POSITION, "用于平面朝向的字段")
-        set_debug_var('yaw_calc_raw', round(raw_yaw, 3), DebugLevel.INFO, DebugCategory.POSITION, f"原始角度({yaw_source})")
-        set_debug_var('yaw_calc_target', round(float(target_yaw), 3), DebugLevel.INFO, DebugCategory.POSITION, "目标yaw角度")
-        set_debug_var('yaw_calc_diff_before', round(yaw_diff_before_norm, 3), DebugLevel.INFO, DebugCategory.POSITION, "标准化前差值")
-        set_debug_var('yaw_calc_diff_after', round(yaw_diff, 3), DebugLevel.INFO, DebugCategory.POSITION, "标准化后差值")
-        set_debug_var('yaw_calc_sign', AlignmentUtils.YAW_SIGN, DebugLevel.INFO, DebugCategory.POSITION, "YAW_SIGN")
-        set_debug_var('yaw_calc_final', round(e_yaw, 3), DebugLevel.INFO, DebugCategory.POSITION, "最终误差e_yaw")
 
         return e_x, e_y, e_yaw
 

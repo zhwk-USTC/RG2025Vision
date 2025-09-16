@@ -20,12 +20,12 @@ def render_nav_drawer():
             with ui.item(on_click=lambda: ui.navigate.to('/config')).classes('q-hoverable q-pa-md'):
                 ui.icon('settings')
                 ui.item_section('配置')
-            with ui.item(on_click=lambda: ui.navigate.to('/sysinfo')).classes('q-hoverable q-pa-md'):
-                ui.icon('memory')
-                ui.item_section('系统信息')
-            with ui.item(on_click=lambda: ui.navigate.to('/about')).classes('q-hoverable q-pa-md'):
-                ui.icon('info')
-                ui.item_section('关于')
+            # with ui.item(on_click=lambda: ui.navigate.to('/sysinfo')).classes('q-hoverable q-pa-md'):
+            #     ui.icon('memory')
+            #     ui.item_section('系统信息')
+            # with ui.item(on_click=lambda: ui.navigate.to('/about')).classes('q-hoverable q-pa-md'):
+            #     ui.icon('info')
+            #     ui.item_section('关于')
 
 @ui.page('/')
 def main_page():

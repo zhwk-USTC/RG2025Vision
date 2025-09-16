@@ -5,13 +5,13 @@
 
 from typing import Optional, Dict, Any, Tuple, Union, Literal
 import time
-from vision import get_vision
+from vision import get_vision, CAM_KEY_TYPE
 from core.logger import logger
 from ..behaviors import base_move, base_rotate, base_stop
 from ..debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, DebugCategory
 
 # 定义相机键名类型
-CameraKey = Union[Literal['front'], Literal['left'], Literal['gripper']]
+CameraKey = CAM_KEY_TYPE
 
 # ---------------------------
 # 控制策略参数（可按实际调参）

@@ -49,25 +49,42 @@ variables:
   - name: gripper_tag_z   # tag相对机械爪的z, 单位：m
     vtype: F32
    
-  - name: gripper_grasp      # 抓取信号，True表示执行抓取动作
+  - name: gripper_grasp_dart    # 抓取信号，True表示执行抓取动作
     vtype: BOOL
-  - name: gripper_release    # 松开信号，True表示执行松开动作
+  - name: gripper_load_dart     # 装填信号，True表示执行装填动作
+    vtype: BOOL
+  - name: gripper_ready         # 机械爪复位，True表示执行复位动作
+    vtype: BOOL
+  - name: gripper_relax        # 机械爪放松，True表示执行放松动作
+    vtype: BOOL
+
+  - name: gripper_grasp_debug      # 机械爪抓取调试，True表示执行抓取动作
+    vtype: BOOL
+  - name: gripper_release_debug    # 机械爪放开调试，True表示执行放开动作
     vtype: BOOL
 
   # --- 发射相关 ---
-  - name: dart_push_forward           # 推进飞镖向前
-    vtype: BOOL
-  - name: dart_push_backward         # 推进飞镖向后
-    vtype: BOOL
-  - name: dart_push_stop             # 停止推进飞镖
-    vtype: BOOL
-
-  - name: friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
-    vtype: BOOL
-  - name: friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮  
-    vtype: BOOL
   - name: friction_wheel_speed  # 摩擦轮速度，单位：m/s
     vtype: F32
+  - name: fire_once         # 发射飞镖, 复合指令
+    vtype: BOOL
+
+  - name: dart_push_once_debug         # 推进飞镖向前,然后回到原位
+    vtype: BOOL
+  - name: dart_push_forward_debug           # 推进飞镖向前
+    vtype: BOOL
+  - name: dart_push_backward_debug         # 推进飞镖向后
+    vtype: BOOL
+  - name: dart_push_stop_debug             # 停止推进飞镖
+    vtype: BOOL
+  - name: dart_push_reset_debug            # 推进飞镖复位
+    vtype: BOOL
+
+  - name: friction_wheel_start_debug  # 启动摩擦轮，True表示启动摩擦轮
+    vtype: BOOL
+  - name: friction_wheel_stop_debug   # 停止摩擦轮，True表示停止摩擦轮
+    vtype: BOOL
+
     
   # --- 炮台相关 ---
   - name: turret_angle_yaw      # 炮台偏航角度，-1到1之间

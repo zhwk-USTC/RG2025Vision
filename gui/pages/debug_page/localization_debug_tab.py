@@ -38,6 +38,37 @@ def get_tag_debug_img(tag_family: str):
         logger.warning(f"无法加载调试图片 {tag_family}: {e}")
         return get_empty_img()
 
+def get_rotated_tag_img(tag_family: str, tag_id: int = 1, rotation_degrees: int = 90):
+    """获取旋转的tag图像"""
+    try:
+        if tag_family == 'tag36h11':
+            # 尝试加载指定ID的tag图像
+            img_path = f"assets\\apriltag-imgs\\tag36h11\\tag36_11_{tag_id:05d}.png"
+            try:
+                img = Image.open(img_path)
+            except FileNotFoundError:
+                # 如果指定ID不存在，使用默认的tag
+                img = Image.open("assets\\apriltag-imgs\\tag36h11\\tag36_11_00000.png")
+                logger.warning(f"Tag ID {tag_id} 不存在，使用默认tag")
+        elif tag_family == 'tag25h9':
+            # 尝试加载指定ID的tag图像
+            img_path = f"assets\\apriltag-imgs\\tag25h9\\tag25_09_{tag_id:05d}.png"
+            try:
+                img = Image.open(img_path)
+            except FileNotFoundError:
+                # 如果指定ID不存在，使用默认的tag
+                img = Image.open("assets\\apriltag-imgs\\tag25h9\\tag25_09_00000.png")
+                logger.warning(f"Tag ID {tag_id} 不存在，使用默认tag")
+        else:
+            return get_empty_img()
+        
+        # 旋转图像
+        rotated_img = img.rotate(rotation_degrees, expand=True)
+        return rotated_img.resize((300, 300), Image.Resampling.NEAREST)
+    except Exception as e:
+        logger.warning(f"无法加载旋转tag图片 {tag_family} ID:{tag_id}: {e}")
+        return get_empty_img()
+
 def get_tag36h11_debug_img():
     return get_tag_debug_img('tag36h11')
 
@@ -74,7 +105,7 @@ def render_localization_tab() -> None:
                 tag_family_select = ui.select(
                     options={'tag36h11': 'Tag36h11', 'tag25h9': 'Tag25h9'},
                     value=global_state['tag_family'],
-                    on_change=lambda e: _on_tag_family_change(e.value, global_state, tag_example_widget),
+                    on_change=lambda e: _on_tag_family_change(e.value, global_state, tag_example_widget, rotated_tag_widget),
                 ).classes('w-32')
                 
                 ui.label('Tag Size').classes('text-caption')
@@ -82,20 +113,27 @@ def render_localization_tab() -> None:
                 tag_size_input.on('update:model-value', lambda e: _on_tag_size_change(e.args, global_state))
                 ui.label('米').classes('text-caption')
             
-            ui.label('Tag 示例').classes('text-subtitle2')
-            tag_example_widget = ui.interactive_image(get_tag_debug_img(global_state['tag_family']))
+            with ui.row().classes('q-gutter-md'):
+                with ui.column().classes('items-center'):
+                    ui.label('标准 Tag').classes('text-subtitle2')
+                    tag_example_widget = ui.interactive_image(get_tag_debug_img(global_state['tag_family']))
+                
+                with ui.column().classes('items-center'):
+                    ui.label('ID=1 旋转90°').classes('text-subtitle2')
+                    rotated_tag_widget = ui.interactive_image(get_rotated_tag_img(global_state['tag_family'], 1, 90))
             
         with ui.column().classes('items-start'):
             ui.label('坐标系方向').classes('text-subtitle2')
             with ui.card().classes('p-4'):
-                ui.label('X轴: 左 ←').classes('text-sm')
-                ui.label('Y轴: 上 ↑').classes('text-sm')
-                ui.label('Z轴: 外 ⊙').classes('text-sm')
+                ui.label('X轴: 右 →').classes('text-sm')
+                ui.label('Y轴: 下 ↓').classes('text-sm')
+                ui.label('Z轴: 内 ⦿').classes('text-sm')
                 ui.label('(右手坐标系)').classes('text-xs text-gray-500')
     
-    def _on_tag_family_change(new_family: str, state: dict, example_widget):
+    def _on_tag_family_change(new_family: str, state: dict, example_widget, rotated_widget):
         state['tag_family'] = new_family
         example_widget.set_source(get_tag_debug_img(new_family))
+        rotated_widget.set_source(get_rotated_tag_img(new_family, 1, 90))
         logger.info(f'切换到 tag family: {new_family}')
     
     def _on_tag_size_change(new_size, state: dict):

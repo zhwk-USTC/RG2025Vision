@@ -10,15 +10,19 @@ class TagPose:
     x: float
     y: float
     z: float
-    yaw: float
-    pitch: float
     roll: float
+    pitch: float
+    yaw: float
+    
+    
     
 @dataclass(slots=True)    
 class CameraPose:
     x: float
     y: float
     z: float
-    yaw: float
-    pitch: float
     roll: float
+    pitch: float
+    yaw: float
+    
+    

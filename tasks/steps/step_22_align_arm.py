@@ -1,4 +1,4 @@
-from ..behaviors import send_gripper_tag_pos
+
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 class Step22AlignArm:

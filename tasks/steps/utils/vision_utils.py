@@ -1,0 +1,131 @@
+
+from typing import Optional
+import time
+from vision import get_vision, CAM_KEY_TYPE
+from core.logger import logger
+from tasks.debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, DebugCategory
+
+
+class VisionUtils:
+    """视觉相关工具函数"""
+
+    @staticmethod
+    def check_vision_system(error_prefix: str = "vision_error") -> bool:
+        vs = get_vision()
+        if not vs:
+            set_debug_var(error_prefix, 'vision not ready', DebugLevel.ERROR, DebugCategory.ERROR, "视觉系统未准备就绪")
+            return False
+        return True
+
+    @staticmethod
+    def get_frame_safely(
+        cam_key: CAM_KEY_TYPE,
+        error_prefix: str = "frame_error",
+        debug_image_key: Optional[str] = None,
+        debug_description: str = ""
+    ):
+        vs = get_vision()
+        if not vs:
+            return None
+
+        # 检查并连接摄像头
+        cam = vs._cameras.get(cam_key)
+        if cam is None:
+            set_debug_var(error_prefix, 'camera not found', DebugLevel.ERROR, DebugCategory.ERROR, f"未找到摄像头 {cam_key}")
+            return None
+        
+        if not cam.is_open:
+            logger.info(f"[VisionUtils] 摄像头 {cam_key} 未连接，正在连接...")
+            if not cam.connect():
+                set_debug_var(error_prefix, 'camera connect failed', DebugLevel.ERROR, DebugCategory.ERROR, f"摄像头 {cam_key} 连接失败")
+                return None
+            logger.info(f"[VisionUtils] 摄像头 {cam_key} 连接成功")
+
+        try:
+            frame = vs.read_frame(cam_key)  # type: ignore
+            if frame is None:
+                set_debug_var(error_prefix, 'empty frame', DebugLevel.ERROR, DebugCategory.ERROR, "无法获取相机帧")
+                return None
+
+            if debug_image_key:
+                set_debug_image(debug_image_key, frame, debug_description)
+            return frame
+        except RuntimeError as e:
+            set_debug_var(error_prefix, f'read frame error: {str(e)}', DebugLevel.ERROR, DebugCategory.ERROR, f"读取相机帧失败: {str(e)}")
+            return None
+
+    @staticmethod
+    def detect_apriltag_with_retry(
+        cam_key: CAM_KEY_TYPE,
+        target_tag_families: str,
+        target_tag_id: Optional[int] = None,
+        max_retries: int = 20,
+        retry_delay: float = 0.05,
+        debug_prefix: str = "tag",
+        debug_description: str = "标签检测"
+    ):
+        vs = get_vision()
+        if not vs:
+            set_debug_var(f'{debug_prefix}_error', 'vision not ready', DebugLevel.ERROR, DebugCategory.ERROR, "视觉系统未准备就绪")
+            return None, None
+
+        iter_cnt = 0
+        while iter_cnt <= max_retries:
+            frame = VisionUtils.get_frame_safely(
+                cam_key,
+                f'{debug_prefix}_error',
+                f'{debug_prefix}_frame',
+                f"{debug_description}时的相机帧"
+            )
+            if frame is None:
+                return None, None
+
+            intr = vs.get_camera_intrinsics(cam_key)  # type: ignore
+            if(target_tag_families == 'tag36h11'):
+                dets = vs.detect_tag36h11(frame, intr)
+            elif target_tag_families == 'tag25h9':
+                dets = vs.detect_tag25h9(frame, intr)
+            else:
+                set_debug_var(f'{debug_prefix}_error', 'unknown tag family', DebugLevel.ERROR, DebugCategory.ERROR, f"未知的标签族: {target_tag_families}")
+                return None, None
+            set_debug_var(f'{debug_prefix}_detections', len(dets) if dets else 0,
+                          DebugLevel.INFO, DebugCategory.DETECTION, f"检测到的{debug_description}数量")
+
+            if not dets:
+                if iter_cnt >= max_retries:
+                    logger.error(f"[{debug_description}] 未检测到标签")
+                    set_debug_var(f'{debug_prefix}_error', 'no tag found',
+                                  DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{debug_description}")
+                    return None, None
+                iter_cnt += 1
+                time.sleep(retry_delay)
+                continue
+
+            # 选择目标标签
+            if target_tag_id is None:
+                det = dets[0]  # 未指定ID时选择第一个
+            else:
+                # 指定了ID时，必须找到对应的标签
+                det = next((d for d in dets if getattr(d, 'tag_id', None) == target_tag_id), None)
+                if det is None:
+                    if iter_cnt >= max_retries:
+                        logger.error(f"[{debug_description}] 未找到指定ID={target_tag_id}的标签")
+                        set_debug_var(f'{debug_prefix}_error', f'target tag {target_tag_id} not found',
+                                      DebugLevel.ERROR, DebugCategory.DETECTION, f"未找到指定{debug_description}ID={target_tag_id}")
+                        return None, None
+                    iter_cnt += 1
+                    time.sleep(retry_delay)
+                    continue
+            set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
+                          DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
+
+            pose = vs.locate_from_tag(det)
+            if pose is None:
+                logger.error(f"[{debug_description}] 无法从标签中定位")
+                set_debug_var(f'{debug_prefix}_error', 'pose none',
+                              DebugLevel.ERROR, DebugCategory.POSITION, "无法从标签获取位姿信息")
+                return None, None
+
+            return det, pose
+
+        return None, None

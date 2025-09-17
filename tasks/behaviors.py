@@ -39,20 +39,24 @@ def base_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
             send_kv({Var.BASE_ROTATE_CCW_SLOW: True})
     
 
+def gripper_ready():
+    send_kv({Var.GRIPPER_READY: True})
+    time.sleep(1)
+    
+def gripper_grasp_dart():
+    send_kv({Var.GRIPPER_GRASP_DART:True})
+    time.sleep(1)
 
-def send_gripper_tag_pos(x: float, y: float, z: float):
-    send_kv({Var.GRIPPER_TAG_X: x, Var.GRIPPER_TAG_Y: y,
-            Var.GRIPPER_TAG_Z: z})
+def gripper_load_dart():
+    send_kv({Var.GRIPPER_LOAD_DART: True})
+    time.sleep(1)
 
-
-def gripper_grasp():
-    send_kv({Var.GRIPPER_GRASP: True})
-
-
-def gripper_release():
-    send_kv({Var.GRIPPER_RELEASE: True})
-
+def gripper_relax():
+    send_kv({Var.GRIPPER_RELAX: True})
     
 def set_fire_speed(speed: float):
     send_kv({Var.FRICTION_WHEEL_SPEED: speed})
+    
+def fire_once():
+    send_kv({Var.FIRE_ONCE:True})
 

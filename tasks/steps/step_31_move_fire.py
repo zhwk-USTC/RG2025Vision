@@ -1,9 +1,5 @@
 from typing import Optional
-from vision import get_vision
-from core.logger import logger
-from ..behaviors import base_move, base_rotate
-from ..debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, DebugCategory
-from .utils import align_to_apriltag
+from .utils import base_align_to_apriltag
 import time
 
 FIRESPOT_TAG_ID = 1  # 发射架的 AprilTag ID
@@ -18,7 +14,7 @@ class Step31MoveFire:
         self.keep_dist = keep_dist
 
     def run(self) -> bool:
-        return align_to_apriltag(
+        return base_align_to_apriltag(
             cam_key=self.cam_key,  # type: ignore
             target_tag_families='tag36h11',
             target_tag_id=self.tag_id,

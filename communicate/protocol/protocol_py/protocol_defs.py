@@ -1,5 +1,5 @@
 # Auto-generated. DO NOT EDIT MANUALLY.
-# Generated at UTC 2025-09-17 07:11:55
+# Generated at UTC 2025-09-17 11:28:06
 # Version policy:
 #   PROTOCOL_DATA_VER_FULL = YYYYMMDDHHMMSS (UTC)
 #   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header
@@ -7,8 +7,8 @@
 from enum import IntEnum
 from typing import Dict, Optional, TypedDict
 
-PROTOCOL_DATA_VER_FULL: int = 20250917071155
-PROTOCOL_DATA_VER: int = 0x33
+PROTOCOL_DATA_VER_FULL: int = 20250917112806
+PROTOCOL_DATA_VER: int = 0xE6
 
 class Msg(IntEnum):
     PC_TO_MCU = 0x01
@@ -33,7 +33,6 @@ class Var(IntEnum):
     DEBUG_ARM_DI_PWM = 0x5F  # U16
     TEST_VAR_U8 = 0x67  # U8
     GRIPPER_TAG_X = 0x69  # F32
-    DATA_ERROR = 0x6A  # U8
     DEBUG_LEFT_FRONT_WHEEL_PWM = 0x6C  # U16
     DEBUG_DART_PUSH_FORWARD = 0x6D  # BOOL
     DEBUG_ARM_DABI_PWM = 0x71  # U16
@@ -48,10 +47,12 @@ class Var(IntEnum):
     BASE_MOVE_FORWARD_SLOW = 0x8C  # BOOL
     ARM_RESET_TO_PREPARE = 0x8D  # BOOL
     DEBUG_FRICTION_WHEEL_STOP = 0x92  # BOOL
+    ERROR = 0x93  # U8
     BASE_ROTATE_CCW_SLOW = 0x94  # BOOL
     ARM_GRASP_DART = 0x95  # BOOL
     BASE_MOVE_BACKWARD_SLOW = 0x99  # BOOL
     BASE_MOVE_LEFT_SLOW = 0x9A  # BOOL
+    OK = 0x9D  # U8
     HEARTBEAT = 0xA6  # U8
     DEBUG_GRIPPER_GRASP = 0xAA  # BOOL
     DEBUG_RIGHT_FRONT_WHEEL_DIR = 0xAD  # U8
@@ -92,7 +93,6 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.DEBUG_ARM_DI_PWM): {"key": "debug_arm_di_pwm", "vtype": "U16", "size": 2},
     int(Var.TEST_VAR_U8): {"key": "test_var_u8", "vtype": "U8", "size": 1},
     int(Var.GRIPPER_TAG_X): {"key": "gripper_tag_x", "vtype": "F32", "size": 4},
-    int(Var.DATA_ERROR): {"key": "DATA_ERROR", "vtype": "U8", "size": 1},
     int(Var.DEBUG_LEFT_FRONT_WHEEL_PWM): {"key": "debug_left_front_wheel_pwm", "vtype": "U16", "size": 2},
     int(Var.DEBUG_DART_PUSH_FORWARD): {"key": "debug_dart_push_forward", "vtype": "BOOL", "size": 1},
     int(Var.DEBUG_ARM_DABI_PWM): {"key": "debug_arm_dabi_pwm", "vtype": "U16", "size": 2},
@@ -107,10 +107,12 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.BASE_MOVE_FORWARD_SLOW): {"key": "base_move_forward_slow", "vtype": "BOOL", "size": 1},
     int(Var.ARM_RESET_TO_PREPARE): {"key": "arm_reset_to_prepare", "vtype": "BOOL", "size": 1},
     int(Var.DEBUG_FRICTION_WHEEL_STOP): {"key": "debug_friction_wheel_stop", "vtype": "BOOL", "size": 1},
+    int(Var.ERROR): {"key": "ERROR", "vtype": "U8", "size": 1},
     int(Var.BASE_ROTATE_CCW_SLOW): {"key": "base_rotate_CCW_slow", "vtype": "BOOL", "size": 1},
     int(Var.ARM_GRASP_DART): {"key": "arm_grasp_dart", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_BACKWARD_SLOW): {"key": "base_move_backward_slow", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_LEFT_SLOW): {"key": "base_move_left_slow", "vtype": "BOOL", "size": 1},
+    int(Var.OK): {"key": "OK", "vtype": "U8", "size": 1},
     int(Var.HEARTBEAT): {"key": "HEARTBEAT", "vtype": "U8", "size": 1},
     int(Var.DEBUG_GRIPPER_GRASP): {"key": "debug_gripper_grasp", "vtype": "BOOL", "size": 1},
     int(Var.DEBUG_RIGHT_FRONT_WHEEL_DIR): {"key": "debug_right_front_wheel_dir", "vtype": "U8", "size": 1},
@@ -147,7 +149,6 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.DEBUG_ARM_DI_PWM): 2,
     int(Var.TEST_VAR_U8): 1,
     int(Var.GRIPPER_TAG_X): 4,
-    int(Var.DATA_ERROR): 1,
     int(Var.DEBUG_LEFT_FRONT_WHEEL_PWM): 2,
     int(Var.DEBUG_DART_PUSH_FORWARD): 1,
     int(Var.DEBUG_ARM_DABI_PWM): 2,
@@ -162,10 +163,12 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.BASE_MOVE_FORWARD_SLOW): 1,
     int(Var.ARM_RESET_TO_PREPARE): 1,
     int(Var.DEBUG_FRICTION_WHEEL_STOP): 1,
+    int(Var.ERROR): 1,
     int(Var.BASE_ROTATE_CCW_SLOW): 1,
     int(Var.ARM_GRASP_DART): 1,
     int(Var.BASE_MOVE_BACKWARD_SLOW): 1,
     int(Var.BASE_MOVE_LEFT_SLOW): 1,
+    int(Var.OK): 1,
     int(Var.HEARTBEAT): 1,
     int(Var.DEBUG_GRIPPER_GRASP): 1,
     int(Var.DEBUG_RIGHT_FRONT_WHEEL_DIR): 1,

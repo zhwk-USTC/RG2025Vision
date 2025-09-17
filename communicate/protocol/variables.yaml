@@ -8,9 +8,11 @@ variables:
     vtype: F32
 
   # --- 通用命令相关 ---
-  - name: DATA_ERROR     # 错误代码
+  - name: ERROR     # 错误代码
     vtype: U8
   - name: HEARTBEAT      # 心跳包
+    vtype: U8
+  - name: OK         # 确认收到命令
     vtype: U8
 
   # --- 底盘移动相关 ---

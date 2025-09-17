@@ -1,24 +1,19 @@
-from nicegui import ui
+from nicegui import ui, app
 from .camera_debug_tab import render_camera_debug_tab
 from .detection_debug_tab import render_detection_debug_tab
 from .localization_debug_tab import render_localization_tab
 from .serial_debug_tab import render_serial_tab
+from gui.utils.tab_memory import create_memorable_tabs
 
 def render_debug_page():
-    with ui.tabs() as tabs:
-        tab1 = ui.tab('摄像头调试')
-        tab2 = ui.tab('检测调试')
-        tab3 = ui.tab('串口调试')
-        tab4 = ui.tab('定位调试')
-
-
-    # 定义对应的标签内容
-    with ui.tab_panels(tabs, value=tab1):
-        with ui.tab_panel(tab1):
-            render_camera_debug_tab()
-        with ui.tab_panel(tab2):
-            render_detection_debug_tab()
-        with ui.tab_panel(tab3):
-            render_serial_tab()
-        with ui.tab_panel(tab4):
-            render_localization_tab()
+    """渲染调试页面，支持Tab记忆功能"""
+    # Tab配置映射
+    tab_configs = {
+        'camera': ('摄像头调试', render_camera_debug_tab),
+        'detection': ('检测调试', render_detection_debug_tab),
+        'serial': ('串口调试', render_serial_tab),
+        'localization': ('定位调试', render_localization_tab)
+    }
+    
+    # 使用通用Tab记忆功能
+    create_memorable_tabs('debug_page_last_tab', tab_configs, 'camera')

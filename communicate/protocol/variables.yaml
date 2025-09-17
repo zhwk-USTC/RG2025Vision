@@ -49,13 +49,18 @@ variables:
   - name: gripper_tag_z   # tag相对机械爪的z, 单位：m
     vtype: F32
    
-  - name: gripper_grasp_dart    # 抓取信号，True表示执行抓取动作
+  - name: gripper_init         # 机械爪初始化
     vtype: BOOL
-  - name: gripper_load_dart     # 装填信号，True表示执行装填动作
+  - name: gripper_init_to_ready   # 机械爪从初始位置移动到抓取位置
     vtype: BOOL
-  - name: gripper_ready         # 机械爪复位，True表示执行复位动作
+  - name: gripper_grasp_dart    # 抓取
     vtype: BOOL
-  - name: gripper_relax        # 机械爪放松，True表示执行放松动作
+  - name: gripper_load_dart     # 从抓取到装填，再回到初始位置
+    vtype: BOOL
+
+  - name: gripper_ready         # 机械爪复位
+    vtype: BOOL
+  - name: gripper_relax        # 机械爪放松
     vtype: BOOL
 
   - name: gripper_grasp_debug      # 机械爪抓取调试，True表示执行抓取动作

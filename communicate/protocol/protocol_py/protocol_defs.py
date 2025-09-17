@@ -1,5 +1,5 @@
 # Auto-generated. DO NOT EDIT MANUALLY.
-# Generated at UTC 2025-09-16 15:39:31
+# Generated at UTC 2025-09-17 04:25:09
 # Version policy:
 #   PROTOCOL_DATA_VER_FULL = YYYYMMDDHHMMSS (UTC)
 #   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header
@@ -7,8 +7,8 @@
 from enum import IntEnum
 from typing import Dict, Optional, TypedDict
 
-PROTOCOL_DATA_VER_FULL: int = 20250916153931
-PROTOCOL_DATA_VER: int = 0x4B
+PROTOCOL_DATA_VER_FULL: int = 20250917042509
+PROTOCOL_DATA_VER: int = 0x4D
 
 class Msg(IntEnum):
     PC_TO_MCU = 0x01
@@ -19,6 +19,7 @@ class Var(IntEnum):
     GRIPPER_GRASP_DEBUG = 0x02  # BOOL
     FRICTION_WHEEL_STOP_DEBUG = 0x0A  # BOOL
     GRIPPER_LOAD_DART = 0x0F  # BOOL
+    GRIPPER_INIT = 0x11  # BOOL
     GRIPPER_TAG_Y = 0x15  # F32
     DART_PUSH_BACKWARD_DEBUG = 0x19  # BOOL
     BASE_MOVE_BACKWARD_FAST = 0x21  # BOOL
@@ -45,6 +46,7 @@ class Var(IntEnum):
     DART_PUSH_RESET_DEBUG = 0xAB  # BOOL
     FRICTION_WHEEL_START_DEBUG = 0xB2  # BOOL
     GRIPPER_GRASP_DART = 0xBA  # BOOL
+    GRIPPER_INIT_TO_READY = 0xBF  # BOOL
     GRIPPER_TAG_Z = 0xC4  # F32
     BASE_MOVE_LEFT_FAST = 0xC5  # BOOL
     BASE_MOVE_RIGHT_SLOW = 0xC9  # BOOL
@@ -63,6 +65,7 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.GRIPPER_GRASP_DEBUG): {"key": "gripper_grasp_debug", "vtype": "BOOL", "size": 1},
     int(Var.FRICTION_WHEEL_STOP_DEBUG): {"key": "friction_wheel_stop_debug", "vtype": "BOOL", "size": 1},
     int(Var.GRIPPER_LOAD_DART): {"key": "gripper_load_dart", "vtype": "BOOL", "size": 1},
+    int(Var.GRIPPER_INIT): {"key": "gripper_init", "vtype": "BOOL", "size": 1},
     int(Var.GRIPPER_TAG_Y): {"key": "gripper_tag_y", "vtype": "F32", "size": 4},
     int(Var.DART_PUSH_BACKWARD_DEBUG): {"key": "dart_push_backward_debug", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_BACKWARD_FAST): {"key": "base_move_backward_fast", "vtype": "BOOL", "size": 1},
@@ -89,6 +92,7 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.DART_PUSH_RESET_DEBUG): {"key": "dart_push_reset_debug", "vtype": "BOOL", "size": 1},
     int(Var.FRICTION_WHEEL_START_DEBUG): {"key": "friction_wheel_start_debug", "vtype": "BOOL", "size": 1},
     int(Var.GRIPPER_GRASP_DART): {"key": "gripper_grasp_dart", "vtype": "BOOL", "size": 1},
+    int(Var.GRIPPER_INIT_TO_READY): {"key": "gripper_init_to_ready", "vtype": "BOOL", "size": 1},
     int(Var.GRIPPER_TAG_Z): {"key": "gripper_tag_z", "vtype": "F32", "size": 4},
     int(Var.BASE_MOVE_LEFT_FAST): {"key": "base_move_left_fast", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_RIGHT_SLOW): {"key": "base_move_right_slow", "vtype": "BOOL", "size": 1},
@@ -103,6 +107,7 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.GRIPPER_GRASP_DEBUG): 1,
     int(Var.FRICTION_WHEEL_STOP_DEBUG): 1,
     int(Var.GRIPPER_LOAD_DART): 1,
+    int(Var.GRIPPER_INIT): 1,
     int(Var.GRIPPER_TAG_Y): 4,
     int(Var.DART_PUSH_BACKWARD_DEBUG): 1,
     int(Var.BASE_MOVE_BACKWARD_FAST): 1,
@@ -129,6 +134,7 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.DART_PUSH_RESET_DEBUG): 1,
     int(Var.FRICTION_WHEEL_START_DEBUG): 1,
     int(Var.GRIPPER_GRASP_DART): 1,
+    int(Var.GRIPPER_INIT_TO_READY): 1,
     int(Var.GRIPPER_TAG_Z): 4,
     int(Var.BASE_MOVE_LEFT_FAST): 1,
     int(Var.BASE_MOVE_RIGHT_SLOW): 1,

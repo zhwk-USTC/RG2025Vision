@@ -126,6 +126,11 @@ def render_enhanced_main_page():
             with ui.card().classes('w-full mb-6'):
                 with ui.card_section():
                     images_content = ui.row().classes('flex-wrap')
+                    with images_content:
+                        empty_img = get_empty_img()
+                        image_widget_1 = ui.interactive_image(empty_img)
+                        image_widget_2 = ui.interactive_image(empty_img)
+                        
             
             # 调试变量区域
             ui.markdown("## 调试变量")
@@ -244,65 +249,32 @@ def render_enhanced_main_page():
                                     ui.label(entry.description).classes('text-xs text-gray-600')
                                 ui.label(entry.timestamp.strftime('%H:%M:%S')).classes('text-xs text-gray-400')
         
-        # 更新图像显示 - 水平排列在顶部
-        with images_content:
-            images_content.clear()
-            if not images_data:
-                ui.label('暂无图像数据').classes('text-gray-500 text-center w-full')
-            else:
-                for key, entry in list(images_data.items())[:4]:  # 最多显示4个图像
-                    with ui.column().classes('mr-4'):
-                        ui.label(key).classes('font-bold text-sm text-center')
-                        if entry.description:
-                            ui.label(entry.description).classes('text-xs text-gray-600 text-center mb-2')
-                        
-                        try:
-                            prepared_img = prepare_image_for_display(entry.image)
-                            ui.interactive_image(prepared_img).classes('max-w-xs')
-                        except Exception as e:
-                            ui.label(f'图像显示错误: {e}').classes('text-red-500 text-xs')
-                        
-                        with ui.column().classes('items-center mt-1'):
-                            ui.label(entry.timestamp.strftime('%H:%M:%S')).classes('text-xs text-gray-400')
-                            if entry.size:
-                                ui.label(f"{entry.size}").classes('text-xs text-gray-400')
-
-        # 更新串口状态
-        with serial_content:
-            serial_content.clear()
+        # 更新图像显示
+        images_list = list(images_data.items())[:2]  # 最多显示2张图片
+        
+        # 更新第一张图片
+        if len(images_list) > 0:
+            key, entry = images_list[0]
             try:
-                serial_obj = get_serial()
-                is_connected = serial_obj.is_open()
-                
-                # 连接状态
-                if is_connected:
-                    ui.badge('已连接', color='green').classes('mr-2')
-                    # 端口和波特率信息
-                    ui.label(f"端口: {serial_obj.cfg.port}").classes('font-medium text-sm')
-                    ui.label(f"波特率: {serial_obj.cfg.baudrate}").classes('text-sm')
-                    
-                    # 最新接收数据状态
-                    try:
-                        frame_bytes, data_bytes, decoded = get_latest_frame()
-                        if frame_bytes:
-                            ui.label(f"最新帧: {len(frame_bytes)}B").classes('text-sm text-green-600')
-                            if data_bytes:
-                                ui.label(f"数据区: {len(data_bytes)}B").classes('text-sm')
-                            else:
-                                ui.label("数据区: 无").classes('text-sm text-gray-500')
-                        else:
-                            ui.label("最新帧: 无").classes('text-sm text-gray-500')
-                    except Exception as e:
-                        ui.label(f"数据获取错误: {str(e)}").classes('text-sm text-red-500')
-                        
-                else:
-                    ui.badge('未连接', color='red').classes('mr-2')
-                    ui.label(f"配置端口: {serial_obj.cfg.port or '未设置'}").classes('text-sm text-gray-500')
-                    ui.label(f"配置波特率: {serial_obj.cfg.baudrate}").classes('text-sm text-gray-500')
-                    
+                prepared_img = prepare_image_for_display(entry.image)
+                image_widget_1.set_source(prepared_img)
             except Exception as e:
-                ui.badge('错误', color='red').classes('mr-2')
-                ui.label(f"串口状态获取失败: {str(e)}").classes('text-sm text-red-500')
+                logger.warning(f"更新第一张图片失败: {e}")
+                image_widget_1.set_source(get_empty_img())
+        else:
+            pass
+            
+        # 更新第二张图片  
+        if len(images_list) > 1:
+            key, entry = images_list[1]
+            try:
+                prepared_img = prepare_image_for_display(entry.image)
+                image_widget_2.set_source(prepared_img)
+            except Exception as e:
+                logger.warning(f"更新第二张图片失败: {e}")
+                image_widget_2.set_source(get_empty_img())
+        else:
+            pass
 
     # 定时刷新
     ui.timer(0.5, refresh_debug)

@@ -12,6 +12,7 @@ ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
 # 各种文件路径
 VISION_CONFIG_PATH      = os.path.join(CONFIG_DIR, "vision_config.json")
 SERIAL_CONFIG_PATH      = os.path.join(CONFIG_DIR, "serial_config.json")
+FIELD_CONFIG_PATH       = os.path.join(CONFIG_DIR, "field_config.json")
 APRILTAG_POSE_PATH      = os.path.join(ASSETS_DIR, "apriltag_pose.json")
 
 

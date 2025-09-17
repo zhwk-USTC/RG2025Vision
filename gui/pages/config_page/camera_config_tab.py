@@ -157,19 +157,19 @@ def render_camera_block(key: str, cam: Camera):
                             on_change=lambda e: on_fps_change(int(e.value)) if e.value else None,
                         ).props('dense')
                         # FourCC / 缓冲
-                        def on_fourcc_change(v):
-                            cfg.fourcc = None if (v is None or v == '默认') else v
-                        ui.select(
-                            {'默认': '默认', 'MJPG': 'MJPG', 'YUY2': 'YUY2', 'H264': 'H264'},
-                            value='默认' if not cfg.fourcc else cfg.fourcc,
-                            label='FourCC',
-                            on_change=lambda e: on_fourcc_change(e.value),
-                        ).props('dense')
-                        ui.number(
-                            label='缓冲', value=cfg.buffersize if cfg.buffersize is not None else 1,
-                            format='%.0f', min=1, max=10, step=1,
-                            on_change=lambda e: setattr(cfg, 'buffersize', int(e.value) if e.value else 1),
-                        ).props('dense')
+                        # def on_fourcc_change(v):
+                        #     cfg.fourcc = None if (v is None or v == '默认') else v
+                        # ui.select(
+                        #     {'默认': '默认', 'MJPG': 'MJPG', 'YUY2': 'YUY2', 'H264': 'H264'},
+                        #     value='默认' if not cfg.fourcc else cfg.fourcc,
+                        #     label='FourCC',
+                        #     on_change=lambda e: on_fourcc_change(e.value),
+                        # ).props('dense')
+                        # ui.number(
+                        #     label='缓冲', value=cfg.buffersize if cfg.buffersize is not None else 1,
+                        #     format='%.0f', min=1, max=10, step=1,
+                        #     on_change=lambda e: setattr(cfg, 'buffersize', int(e.value) if e.value else 1),
+                        # ).props('dense')
 
                     with ui.row().classes('gap-1 q-mt-xs'):
                         ui.button('连接', color='primary', on_click=lambda e: on_connect_camera()).props('dense')
@@ -185,9 +185,27 @@ def render_camera_block(key: str, cam: Camera):
                 # 中：图像（小边距）
                 with ui.column().classes('q-gutter-xs').style('min-width: 360px'):
                     img_widget = ui.interactive_image(_empty_image()).classes('rounded-borders')
-                # 右：状态 + 专业参数（2列栅格）
+                # 右：状态 + 内参 + 专业参数（2列栅格）
                 with ui.column().classes('q-gutter-xs').style('min-width: 360px; max-width: 520px'):
                     status_widget = ui.code(cam.get_status()).props('readonly dense').classes('w-full')
+                    
+                    # 显示相机内参
+                    def get_intrinsics_text():
+                        vs = get_vision()
+                        try:
+                            intrinsics = vs.get_camera_intrinsics(key)  # type: ignore
+                            if intrinsics:
+                                intrin_text = f"fx={getattr(intrinsics, 'fx', 'N/A'):.2f}\nfy={getattr(intrinsics, 'fy', 'N/A'):.2f}\ncx={getattr(intrinsics, 'cx', 'N/A'):.2f}\ncy={getattr(intrinsics, 'cy', 'N/A'):.2f}"
+                            else:
+                                intrin_text = "(无内参信息)"
+                        except Exception as e:
+                            intrin_text = f"(内参读取错误: {e})"
+                        return intrin_text
+                    
+                    intrinsics_widget = ui.code(get_intrinsics_text()).props('readonly dense').classes('w-full')
+                    with ui.row().classes('items-center gap-2'):
+                        ui.label('相机内参').classes('text-caption text-bold')
+
 
                     # 小工具：标题旁的问号提示
                     def info_tip(text: str):

@@ -4,7 +4,7 @@ from typing import Optional
 from PIL import Image
 
 from vision import get_vision, save_vision_config
-from vision.camera import get_camera_info_list, Camera
+from vision.camera import get_camera_info_list, Camera, scan_cameras
 from core.logger import logger
 
 
@@ -18,8 +18,18 @@ def render_camera_config_tab():
     def on_save_config():
         save_vision_config()
 
+    def on_scan_cameras():
+        try:
+            scan_cameras()
+            logger.info('摄像头扫描完成')
+            ui.timer(1.0, lambda: ui.navigate.reload(), once=True)
+        except Exception as e:
+            ui.notify(f'摄像头扫描失败: {e}', type='negative')
+            logger.error(f'摄像头扫描失败: {e}')
+
     with ui.row():
         ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
+        ui.button('扫描摄像头', color='primary', icon='camera_alt', on_click=lambda e: on_scan_cameras())
     # 默认：可独立展开多个
     for key, cam in vs._cameras.items():
         render_camera_block(key, cam)

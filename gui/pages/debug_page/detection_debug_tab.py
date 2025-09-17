@@ -103,7 +103,7 @@ def render_detection_block(key: str, cam: Camera):
 
             # 更新循环
             _debug_loop = {}
-            debug_fps_input = ui.number('FPS', value=30, min=1, max=60, step=1).classes('w-24')
+            debug_fps_input = ui.number('FPS', value=5, min=1, max=60, step=1).classes('w-24')
 
             def _tick():
                 # 1) 抓帧
@@ -138,7 +138,7 @@ def render_detection_block(key: str, cam: Camera):
 
             def on_loop_toggle(enabled: bool):
                 if enabled:
-                    fps = int(debug_fps_input.value or 30)
+                    fps = int(debug_fps_input.value or 5)
                     _debug_loop['timer'] = ui.timer(1.0 / max(1, fps), _tick)
                     logger.info(f'[{key}] 更新循环启动：{fps} FPS')
                 else:

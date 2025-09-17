@@ -173,7 +173,17 @@ def render_serial_tab() -> None:
         
     with ui.row():
         ui.button('保存配置', color='secondary', on_click=lambda e: on_save_config())
-        ui.button('扫描串口', color='primary', on_click=lambda e: scan_serial_ports())
+        def on_scan_serial_ports():
+            try:
+                scan_serial_ports()
+                logger.info('串口扫描完成')
+                # 延迟一点时间让用户看到提示，然后刷新页面
+                ui.timer(1.0, lambda: ui.navigate.reload(), once=True)
+            except Exception as e:
+                ui.notify(f'串口扫描失败: {e}', type='negative')
+                logger.error(f'串口扫描失败: {e}')
+        scan_serial_button = ui.button(
+            '扫描串口', color='primary', on_click=on_scan_serial_ports)
 
     with ui.row():
         ui.select(

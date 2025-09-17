@@ -66,7 +66,7 @@ def render_tag36h11_configs():
 
     # ---- 可展开的元素 ----
     _refresh_header()
-    with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
+    with ui.expansion(value=True).classes('w-full q-mb-md') as exp:
         # 自定义 header（图标 + 动态标题）
         with exp.add_slot('header'):
             with ui.row().classes('items-center gap-2'):
@@ -166,7 +166,7 @@ def render_hsv_configs():
     def _refresh_header():
         header_state['text'] = _header_text()
     _refresh_header()
-    with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
+    with ui.expansion(value=True).classes('w-full q-mb-md') as exp:
         with exp.add_slot('header'):
             with ui.row().classes('items-center gap-2'):
                 ui.icon('adjust')  # 圆形图标
@@ -309,7 +309,7 @@ def render_tag25h9_configs():
 
     # ---- 可展开的元素 ----
     _refresh_header()
-    with ui.expansion(value=False).classes('w-full q-mb-md') as exp:
+    with ui.expansion(value=True).classes('w-full q-mb-md') as exp:
         # 自定义 header（图标 + 动态标题）
         with exp.add_slot('header'):
             with ui.row().classes('items-center gap-2'):

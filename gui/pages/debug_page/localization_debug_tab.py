@@ -208,7 +208,7 @@ def render_localization_block(key: str, timers: dict, global_state: dict, parent
                 tag_id_input = ui.number('', value=None, min=0, step=1).classes('w-24')
 
                 # 更新循环
-                debug_fps_input = ui.number('FPS', value=15, min=1, max=60, step=1).classes('w-28')
+                debug_fps_input = ui.number('FPS', value=5, min=1, max=60, step=1).classes('w-28')
 
                 def _select_detection(dets, target_id: Optional[int]):
                     if not dets:
@@ -293,7 +293,7 @@ def render_localization_block(key: str, timers: dict, global_state: dict, parent
                 def on_loop_toggle(enabled: bool):
                     # 切相机时外层已保证会取消旧 timer；这里只负责当前块
                     if enabled:
-                        fps = int(debug_fps_input.value or 15)
+                        fps = int(debug_fps_input.value or 5)
                         timers['timer'] = ui.timer(1.0 / max(1, fps), _tick)
                         logger.info(f'[{key}] 定位测试循环启动：{fps} FPS')
                     else:

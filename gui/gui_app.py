@@ -32,11 +32,6 @@ def main_page():
     render_nav_drawer()
     render_enhanced_main_page()
 
-@ui.page('/classic')
-def classic_main_page():
-    render_nav_drawer()
-    render_main_page()
-
 @ui.page('/debug')
 def debug_page():
     render_nav_drawer()

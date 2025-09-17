@@ -34,8 +34,10 @@ class Step11NavCenter:
             time.sleep(0.5)
             base_move('left_fast')
             time.sleep(self.move_left)
+            base_stop()
         except Exception as e:
             logger.error(f"[AlignCenter] 执行异常：{e}")
             set_debug_var('nav_center_error', str(e), DebugLevel.ERROR, DebugCategory.ERROR, "导航到中心区域时发生错误")
+            base_stop()
             return False
         return True

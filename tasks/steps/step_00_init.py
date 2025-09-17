@@ -3,7 +3,8 @@ from typing import Optional
 from vision import get_vision
 from core.logger import logger
 from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
-from communicate import Var, send_kv, get_latest_decoded, init_serial, start_serial
+from communicate import Var, send_kv, start_serial
+from ..behaviors import wait_for_ack
 
 class Step00Init:
     """
@@ -21,7 +22,6 @@ class Step00Init:
         set_debug_var('serial_status', 'initializing', DebugLevel.INFO, DebugCategory.STATUS, "正在初始化串口")
         
         try:
-            init_serial()
             if not start_serial():
                 logger.error("[InitSelfcheck] 串口启动失败")
                 set_debug_var('serial_status', 'start_failed', DebugLevel.ERROR, DebugCategory.STATUS, "串口启动失败")
@@ -49,12 +49,6 @@ class Step00Init:
         max_attempts = 20
         timeout = 2.0  # 2秒超时
 
-        def _bytes_to_int_le(b: bytes) -> int:
-            # HEARTBEAT 按协议是1字节；为兼容，允许1/2/4字节小端
-            if not b:
-                return -1
-            return int.from_bytes(b, 'little', signed=False)
-
         for attempt in range(max_attempts):
             logger.info(f"[Handshake] 尝试第 {attempt + 1} 次握手 (HEARTBEAT={self.handshake_seq})")
             set_debug_var('handshake_attempt', attempt + 1,
@@ -66,24 +60,11 @@ class Step00Init:
             })
 
             # 2) 等待 MCU 回同值 HEARTBEAT
-            start_time = time()
-            while time() - start_time < timeout:
-                latest_data = get_latest_decoded()
-                if latest_data is None:
-                    sleep(0.01)
-                    continue
-
-                # 遍历已解码 TLV
-                for tlv in getattr(latest_data, 'tlvs', []):
-                    if tlv.t == Var.HEARTBEAT:
-                        hb_value = _bytes_to_int_le(tlv.v)
-                        if hb_value == (self.handshake_seq & 0xFF):
-                            logger.info("[Handshake] 握手成功（收到匹配的 HEARTBEAT）")
-                            set_debug_var('handshake_status', 'success',
-                                        DebugLevel.SUCCESS, DebugCategory.STATUS, "与单片机握手成功")
-                            return True
-
-                sleep(0.01)
+            if wait_for_ack(Var.HEARTBEAT, self.handshake_seq & 0xFF, timeout):
+                logger.info("[Handshake] 握手成功（收到匹配的 HEARTBEAT）")
+                set_debug_var('handshake_status', 'success',
+                            DebugLevel.SUCCESS, DebugCategory.STATUS, "与单片机握手成功")
+                return True
 
             logger.warning(f"[Handshake] 第 {attempt + 1} 次握手超时")
             # 3) 序号递增并循环到 1 字节

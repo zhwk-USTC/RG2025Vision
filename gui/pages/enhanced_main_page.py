@@ -186,14 +186,14 @@ def render_enhanced_main_page():
                             ui.label('错误变量').classes('text-lg font-bold')
                         error_content = ui.column().classes('mt-2')
 
-    # 串口状态显示 (单独一行)
-    ui.separator().classes('my-4')
-    with ui.card().classes('w-full'):
-        with ui.card_section():
-            with ui.row().classes('items-center'):
-                ui.icon('cable', color='indigo')
-                ui.label('串口状态').classes('text-lg font-bold')
-            serial_content = ui.column().classes('mt-2')
+    # # 串口状态显示 (单独一行)
+    # ui.separator().classes('my-4')
+    # with ui.card().classes('w-full'):
+    #     with ui.card_section():
+    #         with ui.row().classes('items-center'):
+    #             ui.icon('cable', color='indigo')
+    #             ui.label('串口状态').classes('text-lg font-bold')
+    #         serial_content = ui.column().classes('mt-2')
 
 
     def refresh_debug():

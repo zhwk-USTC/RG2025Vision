@@ -1,4 +1,4 @@
-from ..behaviors import gripper_grasp_dart, gripper_load_dart, gripper_ready
+from ..behaviors import arm_reset, arm_reset_to_prepare, arm_grasp_dart, arm_load_dart, wait_for_ack
 
 
 class Step23GraspLoad:
@@ -8,7 +8,8 @@ class Step23GraspLoad:
         pass
 
     def run(self) -> bool:
-        gripper_ready()
-        gripper_grasp_dart()
-        gripper_load_dart()
+        arm_reset()
+        arm_reset_to_prepare()
+        arm_grasp_dart()
+        arm_load_dart()
         return True

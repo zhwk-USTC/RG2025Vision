@@ -160,5 +160,7 @@ class VisionSystem:
             camera_intrinsics=self._camera_intrinsics,
             tag36h11_detector=tag36h11_detector,
             tag36h11_size=self._tag36h11_size,
+            tag25h9_detector=self._tag25h9_detector.get_config(),
+            tag25h9_size=self._tag25h9_size,
             hsv_detector=hsv_detector,
         )

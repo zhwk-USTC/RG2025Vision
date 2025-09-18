@@ -43,6 +43,12 @@ variables:
   - name: base_stop               # 停止移动, True表示停止
     vtype: BOOL
 
+  - name: get_imu_yaw
+    vtype: BOOL
+  - name: imu_yaw                # IMU偏航角, 单位：度
+    vtype: F32
+  - name: imu_reset            # IMU复位, True表示复位
+    vtype: BOOL
 
   - name: debug_left_front_wheel_pwm   # 左前轮PWM速度
     vtype: U16

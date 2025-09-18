@@ -16,27 +16,48 @@ from .vision_utils import VisionUtils
 # ---------------------------
 
 # 平移误差阈值：小于该值认为在容差内
-DEFAULT_TOLERANCE_XY = 0.02
+DEFAULT_TOLERANCE_XY = 0.01
 # 角度误差阈值（弧度）
 DEFAULT_TOLERANCE_YAW = 0.01
 
 # 允许旋转的位移门槛：只有当 |e_x|、|e_y| 都小于该值才会旋转
 ROT_GATE_XY = 0.08  # m
 
-# 单次旋转脉冲时长（秒）
-ROT_PULSE_SEC = 0.20
+# 平移脉冲最小/最大时长（秒）
+MOVE_PULSE_MIN_SEC = 0.08
+MOVE_PULSE_MAX_SEC = 2.00
+# 旋转脉冲最小/最大时长（秒）
+ROT_PULSE_MIN_SEC  = 0.06
+ROT_PULSE_MAX_SEC  = 2.00
 
-# 单次平移脉冲时长（秒）
-MOVE_PULSE_SEC = 0.20
+# 线性误差→时长 的增益（秒/米），例如 1 m 误差→0.35~0.4 s 脉冲
+MOVE_GAIN_SEC_PER_M = 10.0
+# 角度误差→时长 的增益（秒/弧度），例如 1 rad 误差→约 0.3 s 脉冲
+ROT_GAIN_SEC_PER_RAD = 5.0
 
-# 运动指令执行等待时长（秒）
-MOVE_WAIT_SEC = 0.10
+# 当误差超过该阈值时使用“fast”速度档，否则“slow”
+MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
+ROT_FAST_THR_RAD = 0.20     # 旋转快慢阈值（rad）
 
+# 运动指令执行等待时长（秒）——基线（最终会在代码里与动态脉冲叠加）
+MOVE_WAIT_BASE_SEC = 0.1
 
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
     YAW_SIGN: int = -1
+
+    @staticmethod
+    def _sleep_and_stop(pulse_sec: float):
+        """
+        执行脉冲后等待，再停止。等待时长随脉冲动态放大，减少“没走完就测”的抖动。
+        """
+        # 主脉冲
+        time.sleep(max(0.0, pulse_sec))
+        base_stop()
+        # 叠加一点与脉冲相关的“完成等待”（比例系数可按实际调）
+        settle = MOVE_WAIT_BASE_SEC + 0.25 * pulse_sec
+        time.sleep(settle)
 
     @staticmethod
     def calculate_position_error(pose, target_z: float, target_x: float = 0.0, target_yaw: float = 0.0) -> Tuple[float, float, float]:
@@ -71,82 +92,84 @@ class AlignmentUtils:
         return abs(e_x) < tolerance_xy and abs(e_y) < tolerance_xy and abs(e_yaw) < tolerance_yaw
 
     @staticmethod
-    def _pick_speed_tag(mag: float, fast_thr: float) -> Literal['fast', 'slow']:
-        return 'fast' if abs(mag) >= fast_thr else 'slow'
-
-    @staticmethod
     def _move_discrete(e_x: float, e_y: float) -> None:
         """
-        根据 e_x / e_y 误差发出一次“平移”离散指令。
-        规则：
-          - 优先纠正更大的绝对误差
-          - e_x > 0（z 大于目标）→ backward；e_x < 0 → forward
-          - e_y > 0（左偏）→ left；e_y < 0（右偏）→ right
+        根据 e_x / e_y 误差发出一次“平移”离散指令（动态脉冲时长）。
+        —— 保持原有方向逻辑不变：
+        * 优先纠正更大的绝对误差
+        * e_x > 0 → left_slow；e_x < 0 → right_slow
+        * e_y > 0 → forward_slow；e_y < 0 → backward_slow
         """
         ax, ay = abs(e_x), abs(e_y)
 
-        if ax >= ay and ax > 0:
-            # 优先纠正距离误差
+        # 选主轴（保持原逻辑：ax >= ay 时走 e_x 分支，否则走 e_y 分支）
+        use_x = (ax >= ay)
+        mag = ax if use_x else ay
+
+        if mag <= 0.0:
+            base_stop()
+            return
+
+        # ---- 动态脉冲时长：按误差幅值缩放，并夹到 [最小, 最大] ----
+        raw_pulse = MOVE_GAIN_SEC_PER_M * float(mag)
+        pulse_sec = max(MOVE_PULSE_MIN_SEC, min(MOVE_PULSE_MAX_SEC, raw_pulse))
+
+        # ---- 保持“原方向映射”完全不变 ----
+        if use_x:
             if e_x > 0:
-                base_move('left_slow')     # 太远了 → 向左靠近
+                base_move('left_slow')
             else:
-                base_move('right_slow')    # 太近了 → 向右远离
-        elif ay > 0:
+                base_move('right_slow')
+        else:
             if e_y > 0:
                 base_move('forward_slow')
             else:
                 base_move('backward_slow')
-        else:
-            # 误差很小，直接停止
-            base_stop()
-            return
-        
-        # 运动一段时间后停止
-        time.sleep(MOVE_PULSE_SEC)  # 给足够时间让机器人真正移动
+
+        # 动态运动一段时间后停止
+        time.sleep(pulse_sec)
         base_stop()
 
 
     @staticmethod
     def _rotate_discrete(e_yaw: float) -> None:
         """
-        极简旋转：角度误差超出容差就打一发慢速脉冲，然后停止。
-        不做滞回/状态机。
+        角度误差超出容差即打一发“动态脉冲”。
         """
         ayaw = abs(e_yaw)
         if ayaw <= DEFAULT_TOLERANCE_YAW:
             return
+
+        # 动态脉冲：角度 * 增益 → [MIN, MAX]
+        raw_pulse = ROT_GAIN_SEC_PER_RAD * float(ayaw)
+        pulse_sec = max(ROT_PULSE_MIN_SEC, min(ROT_PULSE_MAX_SEC, raw_pulse))
 
         if e_yaw > 0:
             base_rotate('ccw_slow')
         else:
             base_rotate('cw_slow')
 
-        time.sleep(ROT_PULSE_SEC)  # 短脉冲
-        base_stop()
+        AlignmentUtils._sleep_and_stop(pulse_sec)
 
     @staticmethod
     def execute_alignment_move(e_x: float, e_y: float, e_yaw: float):
         """
         简化调度：
-        - 只要线性误差超过容差，就做一次平移微调（slow 脉冲）
-        - 仅当两轴线性误差都很小且角度超容差时才旋转
+        - 只要线性误差超过容差，就做一次平移微调（动态脉冲）
+        - 仅当两轴线性误差都很小且角度超容差时才旋转（动态脉冲）
         - 其余情况停止
         """
         rot_thr = DEFAULT_TOLERANCE_YAW
-
         linear_err = max(abs(e_x), abs(e_y))
 
-        # 1) 线性误差优先：超过线性容差就平移（无视 ROT_GATE_XY）
         if linear_err > DEFAULT_TOLERANCE_XY:
             AlignmentUtils._move_discrete(e_x, e_y)
             return
 
-        # 2) 线性很小，再看角度：仅在两轴都 ≤ ROT_GATE_XY 且角度超容差时旋转
         if abs(e_x) <= ROT_GATE_XY and abs(e_y) <= ROT_GATE_XY and abs(e_yaw) > rot_thr:
             AlignmentUtils._rotate_discrete(e_yaw)
             return
 
-        # 3) 都在容差附近：停
         base_stop()
 
     @staticmethod
@@ -213,9 +236,6 @@ class AlignmentUtils:
             AlignmentUtils.execute_alignment_move(e_x, e_y, e_yaw)
             set_debug_var(f'{debug_prefix}_status', 'adjusting',
                           DebugLevel.INFO, DebugCategory.STATUS, f"正在调整位置对齐{task_name}")
-            
-            # 等待一段时间让运动完成，然后再进行下一次检测
-            time.sleep(MOVE_WAIT_SEC)  # 短暂等待让运动指令完全执行
 
         return True
 

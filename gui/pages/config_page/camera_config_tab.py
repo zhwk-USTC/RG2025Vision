@@ -224,7 +224,7 @@ def render_camera_block(key: str, cam: Camera):
                         return ico
 
                     # --- 曝光/增益 ---
-                    with ui.row().classes('items-center justify-start q-mt-xs q-mb-none'):
+                    with ui.row().classes('items-center justify-start q-mtf-xs q-mb-none'):
                         ui.label('曝光 / 增益').classes('text-primary text-bold')
                         info_tip('建议：先关闭自动曝光(AE)再设定。Windows常用log2(秒)，Linux(V4L2)常用100μs为1单位。交流照明下优先选择与电网频率相关的快门以减轻频闪。')
                     with ui.grid(columns=2).classes('items-center gap-2'):
@@ -248,6 +248,9 @@ def render_camera_block(key: str, cam: Camera):
                                   ).props('dense')
                     ui.label('提示：更长曝光+更低增益通常噪点更少；但需防抖与运动模糊。').classes('text-caption text-grey-6')
 
+                    ui.button('写入曝光(在线)', color='primary',
+                                  on_click=lambda e: cam._set_exposure_smart()
+                                  ).props('dense').classes('col-span-2')
                     # # --- 白平衡 ---
                     # with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):
                     #     ui.label('白平衡').classes('text-primary text-bold')

@@ -18,7 +18,7 @@ from .vision_utils import VisionUtils
 # 平移误差阈值：小于该值认为在容差内
 DEFAULT_TOLERANCE_XY = 0.02
 # 角度误差阈值（弧度）
-DEFAULT_TOLERANCE_YAW = 0.02
+DEFAULT_TOLERANCE_YAW = 0.01
 
 # 允许旋转的位移门槛：只有当 |e_x|、|e_y| 都小于该值才会旋转
 ROT_GATE_XY = 0.08  # m
@@ -27,7 +27,7 @@ ROT_GATE_XY = 0.08  # m
 ROT_PULSE_SEC = 0.20
 
 # 单次平移脉冲时长（秒）
-MOVE_PULSE_SEC = 0.30
+MOVE_PULSE_SEC = 0.20
 
 # 运动指令执行等待时长（秒）
 MOVE_WAIT_SEC = 0.10
@@ -36,7 +36,7 @@ MOVE_WAIT_SEC = 0.10
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
-    YAW_SIGN: int = +1
+    YAW_SIGN: int = -1
 
     @staticmethod
     def calculate_position_error(pose, target_z: float, target_x: float = 0.0, target_yaw: float = 0.0) -> Tuple[float, float, float]:
@@ -47,21 +47,19 @@ class AlignmentUtils:
         e_yaw: 平面朝向误差 —— 注意此处使用 pose.pitch 作为“平面yaw”
         """
         # 距离误差
-        actual_distance = float(pose.z)
         e_x = float(target_z) - float(pose.z)
 
         # 侧向误差
         e_y = float(target_x)- float(pose.x)
 
         import math
-        yaw_diff = float(target_yaw) - float(pose.yaw)
+        yaw_diff = float(target_yaw) - float(pose.pitch)
         while yaw_diff > math.pi:
             yaw_diff -= 2 * math.pi
         while yaw_diff < -math.pi:
             yaw_diff += 2 * math.pi
 
         e_yaw = AlignmentUtils.YAW_SIGN * yaw_diff
-
         return e_x, e_y, e_yaw
 
     @staticmethod
@@ -95,9 +93,9 @@ class AlignmentUtils:
                 base_move('right_slow')    # 太近了 → 向右远离
         elif ay > 0:
             if e_y > 0:
-                base_move('backward_slow')
-            else:
                 base_move('forward_slow')
+            else:
+                base_move('backward_slow')
         else:
             # 误差很小，直接停止
             base_stop()

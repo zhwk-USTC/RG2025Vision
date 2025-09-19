@@ -4,8 +4,9 @@ from .utils import base_align_to_apriltag
 
 TAG_ID = None  # 检测最左边的飞镖，不限定ID
 
-TARGET_Z = 0.5
-TARGET_X = 0.0
+TARGET_Z = -0.27
+
+TARGET_X = -0.06
 
 class Step21AlignBase:
     """

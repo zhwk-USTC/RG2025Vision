@@ -16,7 +16,7 @@ from .vision_utils import VisionUtils
 # ---------------------------
 
 # 平移误差阈值：小于该值认为在容差内
-DEFAULT_TOLERANCE_XY = 0.01
+DEFAULT_TOLERANCE_XY = 0.005
 # 角度误差阈值（弧度）
 DEFAULT_TOLERANCE_YAW = 0.01
 
@@ -24,14 +24,14 @@ DEFAULT_TOLERANCE_YAW = 0.01
 ROT_GATE_XY = 0.08  # m
 
 # 平移脉冲最小/最大时长（秒）
-MOVE_PULSE_MIN_SEC = 0.08
-MOVE_PULSE_MAX_SEC = 2.00
+MOVE_PULSE_MIN_SEC = 0.05
+MOVE_PULSE_MAX_SEC = 1.00
 # 旋转脉冲最小/最大时长（秒）
-ROT_PULSE_MIN_SEC  = 0.06
-ROT_PULSE_MAX_SEC  = 2.00
+ROT_PULSE_MIN_SEC  = 0.05
+ROT_PULSE_MAX_SEC  = 1.00
 
 # 线性误差→时长 的增益（秒/米），例如 1 m 误差→0.35~0.4 s 脉冲
-MOVE_GAIN_SEC_PER_M = 10.0
+MOVE_GAIN_SEC_PER_M = 6.0
 # 角度误差→时长 的增益（秒/弧度），例如 1 rad 误差→约 0.3 s 脉冲
 ROT_GAIN_SEC_PER_RAD = 5.0
 

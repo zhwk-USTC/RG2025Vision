@@ -4,9 +4,9 @@ from core.logger import logger
 from .utils import base_align_to_apriltag
 import time
 
-TAG_ID = 5  # 你要追踪的 AprilTag ID
+TAG_ID = 0  # 你要追踪的 AprilTag ID
 
-TARGET_Z = 0.5  # 你想保持的距离，单位：米
+TARGET_Z = -1.0  # 你想保持的距离，单位：米，负值表示在标签前方
 TARGET_X = 0.0  # 你想保持的侧向位置，单位：米
 
 

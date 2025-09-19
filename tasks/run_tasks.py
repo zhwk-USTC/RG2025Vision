@@ -30,15 +30,23 @@ _STEP_CLASSES = {
 }
 
 # ===== 新增：从 config 读取顺序 =====
-def _load_task_sequence() -> List[str]:
+def _load_task_sequence() -> List[dict]:
+    """加载任务配置，返回包含步骤名称和参数的完整配置信息"""
     try:
         from core.config.tasks_config import load_tasks_config
         config = load_tasks_config()
-        # 过滤未知步骤名，避免因拼写错误导致崩溃
-        return [task.name for task in config.tasks if task.name in _STEP_CLASSES]
+        # 过滤未知步骤名，避免因拼写错误导致崩溃，同时保留参数
+        tasks = []
+        for task in config.tasks:
+            if task.name in _STEP_CLASSES:
+                tasks.append({
+                    'name': task.name, 
+                    'parameters': task.parameters if task.parameters else {}
+                })
+        return tasks
     except Exception:
-        # 回退到默认顺序（等价于你原来的“组”按自然顺序拼接）
-        return list(_STEP_CLASSES.keys())
+        # 回退到默认顺序（等价于你原来的"组"按自然顺序拼接）
+        return [{'name': name, 'parameters': {}} for name in _STEP_CLASSES.keys()]
 
 def is_stop_requested():
     return _stop_requested
@@ -154,21 +162,22 @@ def run_step(step_name: str, **kwargs):
 
 def run_full_process() -> bool:
     """
-    执行全流程（简化版）：
-      Step00Init -> 依序执行任务配置中的步骤 -> Step999Cleanup
+    执行全流程（修改版）：
+      Step00Init -> 依序执行任务配置中的步骤（含参数） -> Step999Cleanup
     """
     global _stop_requested
 
-    seq = _load_task_sequence()
+    # 获取包含参数的任务序列
+    task_configs = _load_task_sequence()
 
     reset_debug_vars()
     set_debug_var('full_process_status', 'starting', DebugLevel.INFO, DebugCategory.STATUS, "全流程开始")
-    set_debug_var('process_sequence', seq, DebugLevel.INFO, DebugCategory.STATUS, f"执行顺序: {seq}")
+    set_debug_var('process_sequence', [t['name'] for t in task_configs], DebugLevel.INFO, DebugCategory.STATUS, f"执行顺序: {[t['name'] for t in task_configs]}")
 
     # 校验步骤存在
-    for name in seq:
-        if name not in _STEP_CLASSES:
-            set_debug_var('error', f'Unknown step: {name}', DebugLevel.ERROR, DebugCategory.ERROR, f"未知步骤: {name}")
+    for task_config in task_configs:
+        if task_config['name'] not in _STEP_CLASSES:
+            set_debug_var('error', f'Unknown step: {task_config["name"]}', DebugLevel.ERROR, DebugCategory.ERROR, f"未知步骤: {task_config['name']}")
             return False
 
     success = False
@@ -186,15 +195,23 @@ def run_full_process() -> bool:
         if is_stop_requested():
             raise TaskStoppedException("Task stopped after initialization")
 
-        # 顺序执行
-        for i, step_name in enumerate(seq, start=1):
+        # 顺序执行，使用配置参数
+        for i, task_config in enumerate(task_configs, start=1):
+            step_name = task_config['name']
+            parameters = task_config['parameters']
+            
             if is_stop_requested():
                 raise TaskStoppedException(f"Task stopped before step {step_name}")
 
             set_debug_var('current_phase', f'seq_{i}_{step_name}', DebugLevel.INFO, DebugCategory.STATUS, f"顺序第{i}步：{step_name}")
+            
+            # 显示参数信息
+            if parameters:
+                set_debug_var('step_params', parameters, DebugLevel.INFO, DebugCategory.STATUS, f"步骤参数: {parameters}")
 
             step_cls = _STEP_CLASSES[step_name]
-            result = step_cls().run()
+            # 使用配置中的参数实例化步骤
+            result = step_cls(**parameters).run()
 
             if is_stop_requested():
                 raise TaskStoppedException(f"Task stopped after {step_name}")
@@ -204,7 +221,7 @@ def run_full_process() -> bool:
                 set_debug_var('sequence_stop_reason', reason, DebugLevel.ERROR, DebugCategory.ERROR, f"顺序执行停止：{step_name} 返回失败")
                 return False
 
-        set_debug_var('full_process_status', 'completed_normally', DebugLevel.SUCCESS, DebugCategory.STATUS, f"全流程正常完成：共执行{len(seq)}步")
+        set_debug_var('full_process_status', 'completed_normally', DebugLevel.SUCCESS, DebugCategory.STATUS, f"全流程正常完成：共执行{len(task_configs)}步")
         success = True
 
     except TaskStoppedException as e:

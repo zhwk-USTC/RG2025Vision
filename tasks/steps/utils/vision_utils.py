@@ -101,13 +101,14 @@ class VisionUtils:
                 time.sleep(retry_delay)
                 continue
 
-            # 选择目标标签
+            # 选择目标标签：选择最左边的（满足ID条件的）标签
             if target_tag_id is None:
-                det = dets[0]  # 未指定ID时选择第一个
+                # 未指定ID时选择最左边的标签（按中心x坐标排序）
+                det = min(dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
             else:
-                # 指定了ID时，必须找到对应的标签
-                det = next((d for d in dets if getattr(d, 'tag_id', None) == target_tag_id), None)
-                if det is None:
+                # 指定了ID时，在满足ID条件的标签中选择最左边的
+                matching_dets = [d for d in dets if getattr(d, 'tag_id', None) == target_tag_id]
+                if not matching_dets:
                     if iter_cnt >= max_retries:
                         logger.error(f"[{debug_description}] 未找到指定ID={target_tag_id}的标签")
                         set_debug_var(f'{debug_prefix}_error', f'target tag {target_tag_id} not found',
@@ -116,6 +117,8 @@ class VisionUtils:
                     iter_cnt += 1
                     time.sleep(retry_delay)
                     continue
+                # 在匹配ID的标签中选择最左边的
+                det = min(matching_dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
             set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
                           DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
 

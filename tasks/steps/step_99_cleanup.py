@@ -36,14 +36,14 @@ class Step999Cleanup:
             logger.warning(f"[Cleanup] 执行器清理异常：{e}")
             ok = False
 
-        # 2) 视觉关停（断开相机、释放资源）
-        try:
-            vs = get_vision()
-            vs.shutdown()
-            logger.info("[Cleanup] 视觉系统已关闭")
-        except Exception as e:
-            logger.warning(f"[Cleanup] 视觉系统清理异常：{e}")
-            ok = False
+        # # 2) 视觉关停（断开相机、释放资源）
+        # try:
+        #     vs = get_vision()
+        #     vs.shutdown()
+        #     logger.info("[Cleanup] 视觉系统已关闭")
+        # except Exception as e:
+        #     logger.warning(f"[Cleanup] 视觉系统清理异常：{e}")
+        #     ok = False
 
         # 3) 通讯释放（串口/Socket）
         try:
@@ -60,6 +60,6 @@ class Step999Cleanup:
         logger.info("[Cleanup] 任务清理完成")
         logger.info("10秒后程序退出")
         time.sleep(1)
-        reset_debug_vars()
+        # reset_debug_vars()
         
         return ok

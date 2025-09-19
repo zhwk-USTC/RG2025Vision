@@ -1,6 +1,6 @@
 from typing import Optional
 from .utils import base_align_to_apriltag
-from core.config.field_config import get_firespot_tag_id, get_current_field
+from core.config.field_config import get_tag_id
 import time
 
 class Step31MoveFire:

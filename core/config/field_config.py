@@ -6,11 +6,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 from core.config.config_manager import load_config, save_config
-from core.paths import CONFIG_DIR
-import os
-
-# 场地配置文件路径
-FIELD_CONFIG_PATH = os.path.join(CONFIG_DIR, "field_config.json")
+from core.paths import FIELD_CONFIG_PATH
 
 @dataclass
 class TagConfig:

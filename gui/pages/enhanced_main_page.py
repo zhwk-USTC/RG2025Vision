@@ -1,387 +1,293 @@
 from nicegui import ui
 from core.logger import logger
-from tasks.run_tasks import start_step_thread, force_stop_current_task, is_task_running, start_default_full_process_thread, start_full_process_thread
-from tasks.debug_vars_enhanced import (
-    get_enhanced_vars, get_enhanced_images, get_debug_summary,
-    DebugLevel, DebugCategory
+from tasks.run_tasks import (
+    start_step_thread,
+    force_stop_current_task,
+    is_task_running,
+    start_default_full_process_thread,
+    start_full_process_thread,
 )
-from communicate import get_serial, get_latest_frame
-from PIL import Image
-import numpy as np
-from typing import Optional, Union
+from tasks.debug_vars_enhanced import (
+    get_enhanced_vars,
+    get_enhanced_images,
+    get_debug_summary,
+    DebugLevel,
+    DebugCategory,
+)
+from gui.utils import get_empty_img, prepare_image_for_display
 
-def np_to_pil(img_np):
-    if img_np is None:
-        return get_empty_img()
-    if isinstance(img_np, Image.Image):
-        return img_np
-    return Image.fromarray(img_np.astype('uint8'), 'RGB')
-
-def get_empty_img():
-    return Image.new("RGB", (320, 240), (200, 200, 200))
-
-def prepare_image_for_display(img_np: Optional[Union[np.ndarray, Image.Image]]) -> Image.Image:
-    """将numpy数组或PIL图像转换为适合显示的PIL格式"""
-    if img_np is None:
-        return get_empty_img()
-    
-    # 转换为PIL图像
-    pil_img = np_to_pil(img_np)
-
-    # 缩放到最大宽度 320px
-    max_width = 320
-    if pil_img.width > max_width:
-        ratio = max_width / pil_img.width
-        new_size = (max_width, int(pil_img.height * ratio))
-        pil_img = pil_img.resize(new_size)
-
-    # 转换为RGB格式（如果需要）
-    if pil_img.mode != 'RGB':
-        pil_img = pil_img.convert('RGB')
-
-    return pil_img
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
 
 def get_level_color(level: DebugLevel) -> str:
-    """根据调试级别获取颜色"""
-    colors = {
+    return {
         DebugLevel.INFO: "blue",
-        DebugLevel.WARNING: "orange", 
+        DebugLevel.WARNING: "orange",
         DebugLevel.ERROR: "red",
-        DebugLevel.SUCCESS: "green"
-    }
-    return colors.get(level, "gray")
+        DebugLevel.SUCCESS: "green",
+    }.get(level, "gray")
 
-def get_category_icon(category: DebugCategory) -> str:
-    """根据分类获取图标"""
-    icons = {
-        DebugCategory.STATUS: "info",
-        DebugCategory.POSITION: "location_on",
-        DebugCategory.DETECTION: "visibility",
-        DebugCategory.CONTROL: "gamepad",
-        DebugCategory.TIMING: "schedule",
-        DebugCategory.ERROR: "error",
-        DebugCategory.IMAGE: "image"
-    }
-    return icons.get(category, "help")
+
+# -----------------------------------------------------------------------------
+# Main entry
+# -----------------------------------------------------------------------------
 
 def render_enhanced_main_page():
-    ui.markdown("# RoboGame2025")
-
-    from tasks.run_tasks import _STEP_CLASSES
-    step_options = list(_STEP_CLASSES.keys())
-
-    with ui.row().classes('w-full gap-4'):
-        # 左侧控制面板
-        with ui.column().classes('w-1/4 min-w-80'):
-            ui.markdown("## 控制面板")
-            
-            # 运行步骤控制
-            selected_step = ui.select(step_options, label="选择要调试的步骤")
-            with ui.row().classes('gap-2'):
-                run_btn = ui.button("运行选中步骤", color="primary")
-                stop_btn = ui.button("强制停止", color="negative").props('icon=stop disable')
-            
-            # 全流程控制
-            ui.separator().classes('my-4')
-            ui.label('全流程控制').classes('text-md font-bold text-blue-600')
-            with ui.row().classes('gap-2'):
-                run_full_btn = ui.button("运行完整流程", color="secondary").props('icon=play_arrow')
-                run_full_custom_btn = ui.button("自定义全流程", color="accent").props('icon=settings')
-            
-            # 全流程配置（初始隐藏）
-            with ui.expansion('自定义流程配置', icon='tune').classes('w-full mt-2') as full_config:
-                full_config.value = False  # 初始收起
-                with ui.column().classes('gap-2 p-2'):
-                    ui.label('Step1组 (只执行一次)').classes('text-sm font-bold')
-                    step1_select = ui.select(['Step11NavCenter', 'Step12AlignStand'], 
-                                            multiple=True, 
-                                            value=['Step11NavCenter', 'Step12AlignStand'],
-                                            label="选择Step1步骤").classes('mb-2')
-                    
-                    ui.label('Step2组 (循环执行)').classes('text-sm font-bold')
-                    step2_select = ui.select(['Step21AlignBase', 'Step22AlignArm', 'Step23Grasp', 'Step24Load'], 
-                                            multiple=True, 
-                                            value=['Step21AlignBase', 'Step22AlignArm', 'Step23Grasp', 'Step24Load'],
-                                            label="选择Step2步骤").classes('mb-2')
-                    
-                    ui.label('Step3组 (循环执行)').classes('text-sm font-bold')
-                    step3_select = ui.select(['Step31MoveFire', 'Step32Fire'], 
-                                            multiple=True, 
-                                            value=['Step31MoveFire', 'Step32Fire'],
-                                            label="选择Step3步骤").classes('mb-2')
-                    
-                    max_cycles_input = ui.number('最大循环次数', value=10, min=1, max=100).classes('w-32')
-        
-            # 汇总信息
-            ui.separator().classes('my-4')
-            summary_card = ui.card().classes('w-full')
-            with summary_card:
-                ui.label('调试汇总').classes('text-lg font-bold')
-                summary_content = ui.column()
-
-        # 中间主要内容区域
-        with ui.column().classes('w-1/2 flex-grow'):
-            # 图像显示区域（放在上方）
-            ui.markdown("## 图像显示")
-            with ui.card().classes('w-full mb-6'):
-                with ui.card_section():
-                    images_content = ui.row().classes('flex-wrap')
-                    with images_content:
-                        empty_img = get_empty_img()
-                        image_widget_1 = ui.interactive_image(empty_img)
-                        image_widget_2 = ui.interactive_image(empty_img)
-                        
-            
-            # 调试变量区域
-            ui.markdown("## 调试变量")
-            
-            # 使用网格布局显示所有变量类别
-            with ui.grid(columns=2).classes('w-full gap-4'):
-                # 左列卡片
-                # 状态变量卡片
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('info', color='blue')
-                            ui.label('状态变量').classes('text-lg font-bold')
-                        status_content = ui.column().classes('mt-2')
-                
-                # 检测变量卡片
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('visibility', color='purple')
-                            ui.label('检测变量').classes('text-lg font-bold')
-                        detection_content = ui.column().classes('mt-2')
-                
-                # 位置变量卡片  
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('location_on', color='green')
-                            ui.label('位置变量').classes('text-lg font-bold')
-                        position_content = ui.column().classes('mt-2')
-                
-                # 时间变量卡片
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('schedule', color='orange')
-                            ui.label('时间变量').classes('text-lg font-bold')
-                        timing_content = ui.column().classes('mt-2')
-                
-                # 控制变量卡片
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('gamepad', color='teal')
-                            ui.label('控制变量').classes('text-lg font-bold')
-                        control_content = ui.column().classes('mt-2')
-                
-                # 错误变量卡片
-                with ui.card().classes('w-full'):
-                    with ui.card_section():
-                        with ui.row().classes('items-center'):
-                            ui.icon('error', color='red')
-                            ui.label('错误变量').classes('text-lg font-bold')
-                        error_content = ui.column().classes('mt-2')
-
-    # # 串口状态显示 (单独一行)
-    # ui.separator().classes('my-4')
-    # with ui.card().classes('w-full'):
-    #     with ui.card_section():
-    #         with ui.row().classes('items-center'):
-    #             ui.icon('cable', color='indigo')
-    #             ui.label('串口状态').classes('text-lg font-bold')
-    #         serial_content = ui.column().classes('mt-2')
+    ui.markdown('# RoboGame2025')
+    render_tasks_panel()
+    ui.separator()
+    render_debug_panel()
 
 
-    def refresh_debug():
-        # 获取增强版调试数据
-        vars_data = get_enhanced_vars()
-        images_data = get_enhanced_images()
-        summary = get_debug_summary()
-        
-        # 更新按钮状态
-        _update_button_states()
-        
-        # 更新汇总信息
-        with summary_content:
-            summary_content.clear()
-            ui.label(f"变量总数: {summary.get('total_vars', 0)}")
-            ui.label(f"图像总数: {summary.get('total_images', 0)}")
-            
-            # 按级别显示计数
-            level_counts = summary.get('by_level', {})
-            if level_counts:
-                with ui.row():
-                    for level, count in level_counts.items():
-                        color = get_level_color(DebugLevel(level))
-                        ui.badge(f"{level}: {count}", color=color)
-        
-        # 按分类更新内容 - 所有类别同时显示
-        categories_content = {
-            DebugCategory.STATUS: status_content,
-            DebugCategory.POSITION: position_content, 
-            DebugCategory.DETECTION: detection_content,
-            DebugCategory.CONTROL: control_content,
-            DebugCategory.TIMING: timing_content,
-            DebugCategory.ERROR: error_content
-        }
-        
-        for category, content_area in categories_content.items():
-            with content_area:
-                content_area.clear()
-                category_vars = {k: v for k, v in vars_data.items() if v.category == category}
-                
-                if not category_vars:
-                    ui.label(f'暂无数据').classes('text-gray-500 text-sm')
-                else:
-                    for key, entry in category_vars.items():
-                        color = get_level_color(entry.level)
-                        
-                        # 使用更紧凑的显示格式
-                        with ui.row().classes('items-center mb-1 p-2 bg-gray-50 rounded'):
-                            ui.badge(entry.level.value, color=color).classes('mr-2')
-                            with ui.column().classes('flex-grow'):
-                                ui.label(f"{key}: {entry.value}").classes('font-medium text-sm')
-                                if entry.description:
-                                    ui.label(entry.description).classes('text-xs text-gray-600')
-                                ui.label(entry.timestamp.strftime('%H:%M:%S')).classes('text-xs text-gray-400')
-        
-        # 更新图像显示
-        images_list = list(images_data.items())[:2]  # 最多显示2张图片
-        
-        # 更新第一张图片
-        if len(images_list) > 0:
-            key, entry = images_list[0]
-            try:
-                prepared_img = prepare_image_for_display(entry.image)
-                image_widget_1.set_source(prepared_img)
-            except Exception as e:
-                logger.warning(f"更新第一张图片失败: {e}")
-                image_widget_1.set_source(get_empty_img())
-        else:
-            pass
-            
-        # 更新第二张图片  
-        if len(images_list) > 1:
-            key, entry = images_list[1]
-            try:
-                prepared_img = prepare_image_for_display(entry.image)
-                image_widget_2.set_source(prepared_img)
-            except Exception as e:
-                logger.warning(f"更新第二张图片失败: {e}")
-                image_widget_2.set_source(get_empty_img())
-        else:
-            pass
+# -----------------------------------------------------------------------------
+# Tasks Panel (simplified)
+# -----------------------------------------------------------------------------
 
-    # 定时刷新
-    ui.timer(0.5, refresh_debug)
+def render_tasks_panel():
+    from tasks.run_tasks import _STEP_CLASSES  # lazy import to avoid cycles
 
-    def _on_run_click():
-        step_name = selected_step.value
-        if not step_name:
-            ui.notify("请选择一个步骤", type="warning")
-            return
-        
+    ui.markdown('## 控制面板')
+
+    # --- Top controls ---
+    with ui.row().classes('gap-2 w-full'):
+        run_full_btn = ui.button('运行完整流程', color='secondary', icon='play_arrow')
+        run_full_custom_btn = ui.button('自定义全流程', color='accent', icon='settings')
+        stop_btn = ui.button('强制停止', color='negative', icon='stop').props('disable=true')
+
+    # --- Steps (auto from _STEP_CLASSES) ---
+
+    step_params: dict[str, dict[str, object]] = {}
+    step_cards: dict[str, ui.button] = {}
+
+    import inspect
+
+    def create_param_input(param_name: str, param: inspect.Parameter):
+        default_value = param.default if param.default != inspect._empty else None
+        param_type = param.annotation if param.annotation != inspect._empty else type(default_value)
+
+        # number (float or int)
+        if param_type in (float, int) or isinstance(default_value, (int, float)):
+            fmt = '%.3f' if isinstance(default_value, float) else '%.0f'
+            return ui.number(label=param_name, value=default_value, format=fmt).props('dense outlined size=sm').classes('w-36 min-w-36')
+        # bool
+        if param_type is bool or isinstance(default_value, bool):
+            return ui.checkbox(text=param_name, value=bool(default_value or False)).props('dense')
+        # fallback: string
+        return ui.input(label=param_name, value='' if default_value is None else str(default_value)).props('dense outlined size=sm').classes('w-48 min-w-48')
+
+    def render_step_card(step_name: str):
+        """单行平铺：左=名称，中=参数，右=运行按钮"""
+        import inspect
+        from tasks.run_tasks import _STEP_CLASSES  # 使用已存在的步骤映射
+
+        step_class = _STEP_CLASSES[step_name]
+        sig = inspect.signature(step_class.__init__)
+
+        with ui.card().classes('w-full mb-2 hover:shadow transition-all'):
+            with ui.card_section().classes('p-3'):
+                # 整行：左(名称) - 中(参数) - 右(运行)
+                with ui.row().classes('items-center w-full gap-3 no-wrap'):
+                    # 左：名称
+                    ui.label(step_name).classes(
+                        'font-bold text-base text-blue-700 shrink-0 min-w-40 max-w-64 truncate'
+                    )
+
+                    # 中：参数（单行横向，可滚动）
+                    params_row = ui.row().classes(
+                        'items-center gap-2 no-wrap overflow-x-auto flex-1'
+                    )
+                    with params_row:
+                        step_params[step_name] = {}
+                        for param_name, param in sig.parameters.items():
+                            if param_name == 'self':
+                                continue
+                            # 复用你现有的输入工厂：create_param_input(param_name, param)
+                            w = create_param_input(param_name, param)
+                            step_params[step_name][param_name] = w
+
+                    # 右：运行按钮
+                    with ui.row().classes('items-center justify-end shrink-0'):
+                        btn = ui.button('运行', color='primary', icon='play_arrow').classes('text-sm px-3')
+                        step_cards[step_name] = btn
+                        btn.on('click', lambda e, n=step_name: _on_run_step_click(n))
+ 
+    # Render all steps (tiled)
+    with ui.expansion('单步骤调试', icon='list_alt', value=True).classes('w-full mt-2'):
+        ui.label('每个步骤可自定义参数；修改后点击“运行”').classes('text-sm text-gray-600 mb-2')
+        with ui.grid(columns=1).classes('w-full gap-2 items-stretch'):
+            for step_name in _STEP_CLASSES.keys():
+                render_step_card(step_name)
+
+    # --- Custom full process (single clean block) ---
+    ui.separator().classes('my-3')
+    ui.label('全流程控制').classes('text-md font-bold text-blue-600')
+
+    # Auto-group steps by prefix: Step1*, Step2*, Step3*
+    def group_steps(prefix: str):
+        return sorted([s for s in _STEP_CLASSES.keys() if s.startswith(prefix)])
+
+    with ui.expansion('自定义流程配置', icon='tune').classes('w-full mt-1') as full_config:
+        full_config.value = False
+        with ui.column().classes('gap-2 p-2'):
+            step1_select = ui.select(group_steps('Step1'), multiple=True, value=group_steps('Step1'), label='Step1组 (只执行一次)').classes('mb-1')
+            step2_select = ui.select(group_steps('Step2'), multiple=True, value=group_steps('Step2'), label='Step2组 (循环执行)').classes('mb-1')
+            step3_select = ui.select(group_steps('Step3'), multiple=True, value=group_steps('Step3'), label='Step3组 (循环执行)').classes('mb-1')
+            max_cycles_input = ui.number('最大循环次数', value=10, min=1, max=100).classes('w-32')
+
+    # --- Handlers ---
+    def _on_run_step_click(step_name: str):
         if is_task_running():
-            ui.notify("已有任务在运行中，请先停止当前任务", type="warning")
+            ui.notify('已有任务在运行中，请先停止当前任务', type='warning')
             return
-            
-        logger.info(f"开始运行步骤: {step_name}")
-        start_step_thread(step_name)
-        ui.notify(f"{step_name} 已启动", type="positive")
-        
-        # 更新按钮状态
-        run_btn.props('loading')
-        stop_btn.props('disable=false')
+        # collect params
+        kwargs = {}
+        for pname, widget in step_params.get(step_name, {}).items():
+            if hasattr(widget, 'value'):
+                val = widget.value
+                if val is not None and val != '':
+                    kwargs[pname] = val
+        try:
+            logger.info(f'开始运行步骤: {step_name}, 参数: {kwargs}')
+            start_step_thread(step_name, **kwargs)
+            ui.notify(f'{step_name} 已启动', type='positive')
+            step_cards[step_name].props('loading')
+            stop_btn.props('disable=false')
+        except Exception as e:
+            logger.error(f'启动步骤失败: {e}')
+            ui.notify(f'启动失败: {e}', type='negative')
 
     def _on_stop_click():
         if not is_task_running():
-            ui.notify("当前没有正在运行的任务", type="info")
+            ui.notify('当前没有正在运行的任务', type='info')
             return
-            
-        logger.info("用户请求强制停止当前任务")
-        
-        # 显示停止进度
-        ui.notify("正在强制停止任务并执行清理...", type="warning", timeout=3000)
-        
-        # 强制停止当前任务（包含清理步骤）
+        ui.notify('正在强制停止任务并清理...', type='warning', timeout=3000)
         try:
             force_stop_current_task()
-            ui.notify("任务已被强制停止，清理已完成", type="positive")
+            ui.notify('任务已停止', type='positive')
         except Exception as e:
-            logger.error(f"强制停止过程中出现异常: {e}")
-            ui.notify(f"强制停止过程中出现异常: {e}", type="negative")
-        
-        # 更新按钮状态
-        run_btn.props('loading=false')
-        run_full_btn.props('loading=false')
-        run_full_custom_btn.props('loading=false')
-        stop_btn.props('disable=true')
-
-    def _on_run_full_click():
-        """运行默认的完整流程"""
-        if is_task_running():
-            ui.notify("已有任务在运行中，请先停止当前任务", type="warning")
-            return
-            
-        logger.info("开始运行默认完整流程")
-        start_default_full_process_thread()
-        ui.notify("默认完整流程已启动", type="positive")
-        
-        # 更新按钮状态
-        run_full_btn.props('loading')
-        stop_btn.props('disable=false')
-
-    def _on_run_full_custom_click():
-        """运行自定义的完整流程"""
-        if is_task_running():
-            ui.notify("已有任务在运行中，请先停止当前任务", type="warning")
-            return
-        
-        # 获取用户选择的步骤组
-        step1_group = step1_select.value if step1_select.value else []
-        step2_group = step2_select.value if step2_select.value else []
-        step3_group = step3_select.value if step3_select.value else []
-        max_cycles = int(max_cycles_input.value) if max_cycles_input.value else 10
-        
-        # 验证配置
-        if not step1_group and not step2_group and not step3_group:
-            ui.notify("请至少选择一个步骤组", type="warning")
-            return
-            
-        logger.info(f"开始运行自定义完整流程: Step1={step1_group}, Step2={step2_group}, Step3={step3_group}, 最大循环={max_cycles}")
-        start_full_process_thread(
-            step1_group=step1_group if step1_group else None,
-            step2_group=step2_group if step2_group else None,
-            step3_group=step3_group if step3_group else None,
-            max_cycles=max_cycles
-        )
-        ui.notify("自定义完整流程已启动", type="positive")
-        
-        # 更新按钮状态
-        run_full_custom_btn.props('loading')
-        stop_btn.props('disable=false')
-
-    def _update_button_states():
-        """更新按钮状态"""
-        if is_task_running():
-            run_btn.props('loading')
-            run_full_btn.props('loading')
-            run_full_custom_btn.props('loading')
-            stop_btn.props('disable=false')
-        else:
-            run_btn.props('loading=false')
+            logger.error(f'强制停止异常: {e}')
+            ui.notify(f'强制停止异常: {e}', type='negative')
+        finally:
+            for _, btn in step_cards.items():
+                btn.props('loading=false')
             run_full_btn.props('loading=false')
             run_full_custom_btn.props('loading=false')
             stop_btn.props('disable=true')
 
-    run_btn.on('click', _on_run_click)
-    stop_btn.on('click', _on_stop_click)
-    run_full_btn.on('click', _on_run_full_click)
-    run_full_custom_btn.on('click', _on_run_full_custom_click)
-    
-    # 定时更新按钮状态
-    ui.timer(1.0, _update_button_states)
+    def _on_run_full_click():
+        if is_task_running():
+            ui.notify('已有任务在运行中，请先停止当前任务', type='warning')
+            return
+        try:
+            logger.info('开始运行默认完整流程')
+            start_default_full_process_thread()
+            ui.notify('默认完整流程已启动', type='positive')
+            run_full_btn.props('loading')
+            stop_btn.props('disable=false')
+        except Exception as e:
+            logger.error(f'启动默认完整流程失败: {e}')
+            ui.notify(f'启动失败: {e}', type='negative')
+
+    def _on_run_full_custom_click():
+        if is_task_running():
+            ui.notify('已有任务在运行中，请先停止当前任务', type='warning')
+            return
+        s1 = step1_select.value or []
+        s2 = step2_select.value or []
+        s3 = step3_select.value or []
+        max_cycles = int(max_cycles_input.value or 10)
+        if not s1 and not s2 and not s3:
+            ui.notify('请至少选择一个步骤组', type='warning')
+            return
+        try:
+            logger.info(f'开始自定义完整流程: Step1={s1}, Step2={s2}, Step3={s3}, 最大循环={max_cycles}')
+            start_full_process_thread()
+            ui.notify('自定义完整流程已启动', type='positive')
+            run_full_custom_btn.props('loading')
+            stop_btn.props('disable=false')
+        except Exception as e:
+            logger.error(f'启动自定义完整流程失败: {e}')
+            ui.notify(f'启动失败: {e}', type='negative')
+
+    # wire buttons
+    stop_btn.on('click', lambda e: _on_stop_click())
+    run_full_btn.on('click', lambda e: _on_run_full_click())
+    run_full_custom_btn.on('click', lambda e: _on_run_full_custom_click())
+
+
+# -----------------------------------------------------------------------------
+# Debug Panel (simplified)
+# -----------------------------------------------------------------------------
+
+def render_debug_panel():
+    ui.markdown('## 诊断')
+
+    # Images row (max 2)
+    with ui.card().classes('w-full mb-3'):
+        with ui.row().classes('flex-wrap gap-2 p-2'):
+            empty_img = get_empty_img()
+            img1 = ui.interactive_image(empty_img).classes('rounded-borders')
+            img2 = ui.interactive_image(empty_img).classes('rounded-borders')
+
+    # Vars as tabs to reduce clutter
+    with ui.tabs() as tabs:
+        t_status = ui.tab('状态')
+        t_detect = ui.tab('检测')
+        t_position = ui.tab('位置')
+        t_control = ui.tab('控制')
+        t_timing = ui.tab('时间')
+        t_error = ui.tab('错误')
+
+    with ui.tab_panels(tabs, value=t_status).classes('w-full'):
+        p_status = ui.tab_panel(t_status)
+        p_detect = ui.tab_panel(t_detect)
+        p_position = ui.tab_panel(t_position)
+        p_control = ui.tab_panel(t_control)
+        p_timing = ui.tab_panel(t_timing)
+        p_error = ui.tab_panel(t_error)
+
+    containers = {
+        DebugCategory.STATUS: p_status,
+        DebugCategory.DETECTION: p_detect,
+        DebugCategory.POSITION: p_position,
+        DebugCategory.CONTROL: p_control,
+        DebugCategory.TIMING: p_timing,
+        DebugCategory.ERROR: p_error,
+    }
+
+    def refresh():
+        vars_data = get_enhanced_vars()
+        images_data = get_enhanced_images()
+        _ = get_debug_summary()  # kept for parity; could be shown if needed
+
+        # update images
+        items = list(images_data.items())[:2]
+        try:
+            if len(items) > 0:
+                img1.set_source(prepare_image_for_display(items[0][1].image))
+            if len(items) > 1:
+                img2.set_source(prepare_image_for_display(items[1][1].image))
+        except Exception as e:
+            logger.warning(f'更新图像失败: {e}')
+
+        # update vars per category
+        for cat, panel in containers.items():
+            panel.clear()
+            cat_vars = {k: v for k, v in vars_data.items() if v.category == cat}
+            if not cat_vars:
+                with panel:
+                    ui.label('暂无数据').classes('text-gray-500 text-sm p-2')
+                continue
+            with panel:
+                for k, entry in cat_vars.items():
+                    color = get_level_color(entry.level)
+                    with ui.row().classes('items-center mb-1 p-2 bg-gray-50 rounded'):
+                        ui.badge(entry.level.value, color=color).classes('mr-2')
+                        with ui.column().classes('flex-grow'):
+                            ui.label(f'{k}: {entry.value}').classes('font-medium text-sm')
+                            if entry.description:
+                                ui.label(entry.description).classes('text-xs text-gray-600')
+                            ui.label(entry.timestamp.strftime('%H:%M:%S')).classes('text-xs text-gray-400')
+
+    ui.timer(0.5, refresh)

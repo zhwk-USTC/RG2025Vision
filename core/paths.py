@@ -13,7 +13,7 @@ ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
 VISION_CONFIG_PATH      = os.path.join(CONFIG_DIR, "vision_config.json")
 SERIAL_CONFIG_PATH      = os.path.join(CONFIG_DIR, "serial_config.json")
 FIELD_CONFIG_PATH       = os.path.join(CONFIG_DIR, "field_config.json")
-APRILTAG_POSE_PATH      = os.path.join(ASSETS_DIR, "apriltag_pose.json")
+TASKS_CONFIG_PATH       = os.path.join(CONFIG_DIR, "tasks_config.json")
 
 
 # 确保 .config 存在（assets 是随代码发布的，不自动创建）

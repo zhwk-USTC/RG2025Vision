@@ -1,7 +1,7 @@
 # tasks/step_1_1_align_center.py
 import time
 from core.logger import logger
-from ..behaviors import base_move, base_stop
+from ..utils.communicate_utils import base_move, base_stop
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 MOVE_FORWARD_TIME = 1.0

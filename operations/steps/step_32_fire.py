@@ -1,5 +1,5 @@
 from typing import Optional
-from ..behaviors import set_fire_speed, fire_once
+from ..utils.communicate_utils import set_fire_speed, fire_once
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 class Step32Fire:

@@ -3,7 +3,7 @@ from typing import Optional
 import time
 from vision import get_vision, CAM_KEY_TYPE
 from core.logger import logger
-from tasks.debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, DebugCategory
+from ..debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, DebugCategory
 
 
 class VisionUtils:

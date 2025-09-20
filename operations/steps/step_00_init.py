@@ -4,7 +4,7 @@ from vision import get_vision
 from core.logger import logger
 from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
 from communicate import Var, send_kv, start_serial
-from ..behaviors import wait_for_ack
+from ..utils.communicate_utils import wait_for_ack
 
 class Step00Init:
     """

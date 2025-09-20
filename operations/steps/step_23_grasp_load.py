@@ -1,4 +1,4 @@
-from ..behaviors import arm_reset, arm_reset_to_prepare, arm_grasp_dart, arm_load_dart, wait_for_ack
+from ..utils.communicate_utils import arm_reset, arm_reset_to_prepare, arm_grasp_dart, arm_load_dart, wait_for_ack
 
 
 class Step23GraspLoad:

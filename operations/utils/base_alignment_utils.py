@@ -7,8 +7,8 @@ from typing import Optional, Tuple, Literal
 import time
 from vision import get_vision, CAM_KEY_TYPE
 from core.logger import logger
-from tasks.behaviors import base_move, base_rotate, base_stop
-from tasks.debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
+from .communicate_utils import base_move, base_rotate, base_stop
+from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 from .vision_utils import VisionUtils
 
 # ---------------------------
@@ -25,22 +25,24 @@ ROT_GATE_XY = 0.08  # m
 
 # 平移脉冲最小/最大时长（秒）
 MOVE_PULSE_MIN_SEC = 0.05
-MOVE_PULSE_MAX_SEC = 1.00
+MOVE_PULSE_MAX_SEC = 2.00
 # 旋转脉冲最小/最大时长（秒）
 ROT_PULSE_MIN_SEC  = 0.05
-ROT_PULSE_MAX_SEC  = 1.00
+ROT_PULSE_MAX_SEC  = 2.00
 
-# 线性误差→时长 的增益（秒/米），例如 1 m 误差→0.35~0.4 s 脉冲
-MOVE_GAIN_SEC_PER_M = 6.0
-# 角度误差→时长 的增益（秒/弧度），例如 1 rad 误差→约 0.3 s 脉冲
-ROT_GAIN_SEC_PER_RAD = 5.0
+# 速度参数（米/秒）
+SLOW_SPEED_MPS = 0.1    # 慢速移动速度
+FAST_SPEED_MPS = 0.3    # 快速移动速度
+# 旋转速度参数（弧度/秒，估算）
+SLOW_ROT_SPEED_RPS = 0.2    # 慢速旋转角速度  
+FAST_ROT_SPEED_RPS = 0.6    # 快速旋转角速度
 
 # 当误差超过该阈值时使用“fast”速度档，否则“slow”
 MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
 ROT_FAST_THR_RAD = 0.20     # 旋转快慢阈值（rad）
 
 # 运动指令执行等待时长（秒）——基线（最终会在代码里与动态脉冲叠加）
-MOVE_WAIT_BASE_SEC = 0.1
+MOVE_WAIT_BASE_SEC = 0.5
 
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
@@ -56,7 +58,7 @@ class AlignmentUtils:
         time.sleep(max(0.0, pulse_sec))
         base_stop()
         # 叠加一点与脉冲相关的“完成等待”（比例系数可按实际调）
-        settle = MOVE_WAIT_BASE_SEC + 0.25 * pulse_sec
+        settle = MOVE_WAIT_BASE_SEC
         time.sleep(settle)
 
     @staticmethod
@@ -110,25 +112,26 @@ class AlignmentUtils:
             base_stop()
             return
 
-        # ---- 动态脉冲时长：按误差幅值缩放，并夹到 [最小, 最大] ----
-        raw_pulse = MOVE_GAIN_SEC_PER_M * float(mag)
+        # 根据误差大小选择快慢速度
+        is_fast = mag > MOVE_FAST_THR_M
+        speed = FAST_SPEED_MPS if is_fast else SLOW_SPEED_MPS
+        
+        # 脉冲时长 = 距离 / 速度
+        raw_pulse = float(mag) / speed
         pulse_sec = max(MOVE_PULSE_MIN_SEC, min(MOVE_PULSE_MAX_SEC, raw_pulse))
 
-        # ---- 保持“原方向映射”完全不变 ----
+        # ---- 根据误差大小选择快慢速度档位 ----
+        
         if use_x:
             if e_x > 0:
-                base_move('left_slow')
+                base_move('left_fast' if is_fast else 'left_slow')
             else:
-                base_move('right_slow')
+                base_move('right_fast' if is_fast else 'right_slow')
         else:
             if e_y > 0:
-                base_move('forward_slow')
+                base_move('forward_fast' if is_fast else 'forward_slow')
             else:
-                base_move('backward_slow')
-
-        # 动态运动一段时间后停止
-        time.sleep(pulse_sec)
-        base_stop()
+                base_move('backward_fast' if is_fast else 'backward_slow')
 
 
     @staticmethod
@@ -140,16 +143,20 @@ class AlignmentUtils:
         if ayaw <= DEFAULT_TOLERANCE_YAW:
             return
 
-        # 动态脉冲：角度 * 增益 → [MIN, MAX]
-        raw_pulse = ROT_GAIN_SEC_PER_RAD * float(ayaw)
+        # 根据角度误差大小选择快慢速度
+        is_fast = False
+        rot_speed = FAST_ROT_SPEED_RPS if is_fast else SLOW_ROT_SPEED_RPS
+        
+        # 脉冲时长 = 角度 / 角速度
+        raw_pulse = float(ayaw) / rot_speed
         pulse_sec = max(ROT_PULSE_MIN_SEC, min(ROT_PULSE_MAX_SEC, raw_pulse))
 
+        speed_suffix = '_fast' if is_fast else '_slow'
+        
         if e_yaw > 0:
-            base_rotate('ccw_slow')
+            base_rotate('ccw_fast' if is_fast else 'ccw_slow')
         else:
-            base_rotate('cw_slow')
-
-        AlignmentUtils._sleep_and_stop(pulse_sec)
+            base_rotate('cw_fast' if is_fast else 'cw_slow')
 
     @staticmethod
     def execute_alignment_move(e_x: float, e_y: float, e_yaw: float):

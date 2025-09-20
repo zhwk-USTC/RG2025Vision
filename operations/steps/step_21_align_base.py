@@ -1,12 +1,12 @@
 from typing import Optional
 from core.logger import logger
-from .utils import base_align_to_apriltag
+from ..utils import base_align_to_apriltag
 
 TAG_ID = None  # 检测最左边的飞镖，不限定ID
 
 TARGET_Z = -0.27
 
-TARGET_X = -0.06
+TARGET_X = -0.05
 
 class Step21AlignBase:
     """
@@ -33,3 +33,4 @@ class Step21AlignBase:
             task_name='AlignToDart',
             target_x=self.target_x,
         )
+

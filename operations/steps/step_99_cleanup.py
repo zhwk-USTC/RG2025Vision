@@ -2,7 +2,7 @@ from core.logger import logger
 from vision import get_vision
 from communicate import stop_serial
 from time import sleep
-from ..behaviors import *
+from ..utils.communicate_utils import *
 from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
 import time
 

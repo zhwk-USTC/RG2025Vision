@@ -199,8 +199,8 @@ def render_tasks_panel():
                     step_param_widgets[step_name] = {}
                     _param_items = [(pn, pa) for pn, pa in sig.parameters.items() if pn != 'self']
                     if _param_items:
-                        params_row = ui.row().classes('items-center gap-2 no-wrap overflow-x-auto flex-1')
-                        with params_row:
+                        params_col = ui.column().classes('gap-2 flex-1')
+                        with params_col:
                             for pname, param in _param_items:
                                 w = _create_param_input(pname, param, preset.get(pname))
                                 step_param_widgets[step_name][pname] = w
@@ -246,7 +246,8 @@ def render_tasks_panel():
 
                                 def on_step_change(e, i=idx):
                                     if i < len(nodes_state):
-                                        new_value = e.value
+                                        # 获取更新后的值 
+                                        new_value = e if isinstance(e, str) else getattr(e, 'value', None)
                                         nodes_state[i]['name'] = new_value
                                         nodes_state[i]['parameters'] = {}
                                         _render_items()
@@ -259,7 +260,7 @@ def render_tasks_panel():
                                     # 仅当存在除 self 外的参数才渲染参数区域
                                     _param_items = [(pn, pa) for pn, pa in sig.parameters.items() if pn != 'self']
                                     if _param_items:
-                                        with ui.row().classes('items-center gap-2 no-wrap overflow-x-auto flex-1'):
+                                        with ui.column().classes('gap-2 flex-1 mt-2'):
                                             for pname, p in _param_items:
                                                 current = (item.get('parameters') or {}).get(pname)
                                                 w = _create_param_input(pname, p, preset=current)
@@ -310,7 +311,7 @@ def render_tasks_panel():
                                     sig = inspect.signature(_COND_NODE_CLASSES[cond_name].__init__)
                                     _param_items = [(pn, pa) for pn, pa in sig.parameters.items() if pn != 'self']
                                     if _param_items:
-                                        with ui.row().classes('items-center gap-2 no-wrap overflow-x-auto flex-1'):
+                                        with ui.column().classes('gap-2 flex-1 mt-2'):
                                             for pname, p in _param_items:
                                                 current = (item.get('parameters') or {}).get(pname)
                                                 w = _create_param_input(pname, p, preset=current)
@@ -395,7 +396,7 @@ def render_tasks_panel():
             itype = item.get('type', 'task')
 
             if itype == 'task':
-                name = item.get('__sel').value if item.get('__sel') else item.get('name')
+                name = getattr(item.get('__sel'), 'value', item.get('name')) if item.get('__sel') else item.get('name')
                 params = {}
                 step_name = name
                 if step_name and step_name in _TASK_NODE_CLASSES:
@@ -414,8 +415,8 @@ def render_tasks_panel():
                 new_nodes.append(OperationNodeConfig(type='task', id=f'task_{idx}', name=name, parameters=params))
 
             elif itype == 'condition':
-                node_id = item.get('__id_input').value if item.get('__id_input') else item.get('id') or f'cond_{idx}'
-                cond_name = item.get('__sel').value if item.get('__sel') else item.get('name')
+                node_id = getattr(item.get('__id_input'), 'value', item.get('id')) if item.get('__id_input') else item.get('id') or f'cond_{idx}'
+                cond_name = getattr(item.get('__sel'), 'value', item.get('name')) if item.get('__sel') else item.get('name')
                 params = {}
                 if cond_name and cond_name in _COND_NODE_CLASSES:
                     sig = inspect.signature(_COND_NODE_CLASSES[cond_name].__init__)
@@ -436,8 +437,8 @@ def render_tasks_panel():
 
             elif itype == 'target':
                 # 显式保存 target（使用 UI 中的只读/可编辑输入）
-                t_id = item.get('__id_input_target').value if item.get('__id_input_target') else item.get('id', '')
-                t_name = item.get('__name_input_target').value if item.get('__name_input_target') else item.get('name', 'TargetAnchor')
+                t_id = getattr(item.get('__id_input_target'), 'value', item.get('id', '')) if item.get('__id_input_target') else item.get('id', '')
+                t_name = getattr(item.get('__name_input_target'), 'value', item.get('name', 'TargetAnchor')) if item.get('__name_input_target') else item.get('name', 'TargetAnchor')
                 new_nodes.append(OperationNodeConfig(type='target', id=t_id, name=t_name, parameters={}))
                 target_ids.append(t_id)
 

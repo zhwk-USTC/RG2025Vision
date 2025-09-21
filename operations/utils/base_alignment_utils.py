@@ -57,7 +57,7 @@ class AlignmentUtils:
         # 主脉冲
         time.sleep(max(0.0, pulse_sec))
         base_stop()
-        # 叠加一点与脉冲相关的“完成等待”（比例系数可按实际调）
+        # 叠加一点与脉冲相关的“完成等待”
         settle = MOVE_WAIT_BASE_SEC
         time.sleep(settle)
 
@@ -88,13 +88,15 @@ class AlignmentUtils:
     @staticmethod
     def is_aligned(
         e_x: float, e_y: float, e_yaw: float,
-        tolerance_xy: float = DEFAULT_TOLERANCE_XY,
+        tolerance_x: float = DEFAULT_TOLERANCE_XY,
+        tolerance_z: float = DEFAULT_TOLERANCE_XY,
         tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
     ) -> bool:
-        return abs(e_x) < tolerance_xy and abs(e_y) < tolerance_xy and abs(e_yaw) < tolerance_yaw
+        # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
+        return abs(e_x) < tolerance_z and abs(e_y) < tolerance_x and abs(e_yaw) < tolerance_yaw
 
     @staticmethod
-    def _move_discrete(e_x: float, e_y: float) -> None:
+    def _move_discrete(e_x: float, e_y: float, cam_key: CAM_KEY_TYPE) -> None:
         """
         根据 e_x / e_y 误差发出一次“平移”离散指令（动态脉冲时长）。
         —— 保持原有方向逻辑不变：
@@ -121,26 +123,41 @@ class AlignmentUtils:
         pulse_sec = max(MOVE_PULSE_MIN_SEC, min(MOVE_PULSE_MAX_SEC, raw_pulse))
 
         # ---- 根据误差大小选择快慢速度档位 ----
-        
-        if use_x:
-            if e_x > 0:
-                base_move('left_fast' if is_fast else 'left_slow')
+        if cam_key == "front":
+    # 前方相机的移动逻辑
+            if use_x:
+                if e_x > 0:
+                    base_move('forward_fast' if is_fast else 'forward_slow')
+                else:
+                    base_move('backward_fast' if is_fast else 'backward_slow')
             else:
-                base_move('right_fast' if is_fast else 'right_slow')
+                if e_y > 0:
+                    base_move('left_fast' if is_fast else 'left_slow')
+                else:
+                    base_move('right_fast' if is_fast else 'right_slow')
         else:
-            if e_y > 0:
-                base_move('forward_fast' if is_fast else 'forward_slow')
+            # left 相机的移动逻辑（默认）
+            if use_x:
+                if e_x > 0:
+                    base_move('left_fast' if is_fast else 'left_slow')
+                else:
+                    base_move('right_fast' if is_fast else 'right_slow')
             else:
-                base_move('backward_fast' if is_fast else 'backward_slow')
+                if e_y > 0:
+                    base_move('forward_fast' if is_fast else 'forward_slow')
+                else:
+                    base_move('backward_fast' if is_fast else 'backward_slow')
+                
+        AlignmentUtils._sleep_and_stop(pulse_sec)
 
 
     @staticmethod
-    def _rotate_discrete(e_yaw: float) -> None:
+    def _rotate_discrete(e_yaw: float, tolerance_yaw: float = DEFAULT_TOLERANCE_YAW) -> None:
         """
         角度误差超出容差即打一发“动态脉冲”。
         """
         ayaw = abs(e_yaw)
-        if ayaw <= DEFAULT_TOLERANCE_YAW:
+        if ayaw <= tolerance_yaw:
             return
 
         # 根据角度误差大小选择快慢速度
@@ -157,25 +174,35 @@ class AlignmentUtils:
             base_rotate('ccw_fast' if is_fast else 'ccw_slow')
         else:
             base_rotate('cw_fast' if is_fast else 'cw_slow')
+        
+        AlignmentUtils._sleep_and_stop(pulse_sec)
 
     @staticmethod
-    def execute_alignment_move(e_x: float, e_y: float, e_yaw: float):
+    def execute_alignment_move(
+        e_x: float, e_y: float, e_yaw: float, cam_key: CAM_KEY_TYPE,
+        tolerance_x: float = DEFAULT_TOLERANCE_XY,
+        tolerance_z: float = DEFAULT_TOLERANCE_XY,
+        tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
+    ):
         """
         简化调度：
         - 只要线性误差超过容差，就做一次平移微调（动态脉冲）
         - 仅当两轴线性误差都很小且角度超容差时才旋转（动态脉冲）
         - 其余情况停止
         """
-        rot_thr = DEFAULT_TOLERANCE_YAW
-        linear_err = max(abs(e_x), abs(e_y))
-
-        if linear_err > DEFAULT_TOLERANCE_XY:
-            AlignmentUtils._move_discrete(e_x, e_y)
+        # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
+        x_aligned = abs(e_y) <= tolerance_x  # 左右对齐
+        z_aligned = abs(e_x) <= tolerance_z  # 前后对齐
+        
+        if not (x_aligned and z_aligned):
+            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
             return
 
-        if abs(e_x) <= ROT_GATE_XY and abs(e_y) <= ROT_GATE_XY and abs(e_yaw) > rot_thr:
-            AlignmentUtils._rotate_discrete(e_yaw)
-            return
+        if x_aligned and z_aligned and abs(e_yaw) > tolerance_yaw:
+            # 只有当位置都对齐且在旋转门槛内时才旋转
+            if abs(e_x) <= ROT_GATE_XY and abs(e_y) <= ROT_GATE_XY:
+                AlignmentUtils._rotate_discrete(e_yaw, tolerance_yaw)
+                return
 
         base_stop()
 
@@ -190,6 +217,9 @@ class AlignmentUtils:
         *,
         target_x: float = 0.0,
         target_yaw: float = 0.0,
+        tolerance_x: float = DEFAULT_TOLERANCE_XY,
+        tolerance_z: float = DEFAULT_TOLERANCE_XY,
+        tolerance_yaw: float = DEFAULT_TOLERANCE_YAW,
         max_retries: int = 20
         
     ) -> bool:
@@ -233,14 +263,24 @@ class AlignmentUtils:
                 DebugLevel.INFO, DebugCategory.POSITION, "与目标位置的误差"
             )
 
-            if AlignmentUtils.is_aligned(e_x, e_y, e_yaw):
+            if AlignmentUtils.is_aligned(
+                e_x, e_y, e_yaw,
+                tolerance_x=tolerance_x,
+                tolerance_z=tolerance_z,
+                tolerance_yaw=tolerance_yaw
+            ):
                 base_stop()
                 logger.info(f"[{task_name}] 已对齐到目标位置")
                 set_debug_var(f'{debug_prefix}_status', 'done',
                               DebugLevel.SUCCESS, DebugCategory.STATUS, f"已成功对齐到{task_name}")
                 break
 
-            AlignmentUtils.execute_alignment_move(e_x, e_y, e_yaw)
+            AlignmentUtils.execute_alignment_move(
+                e_x, e_y, e_yaw, cam_key,
+                tolerance_x=tolerance_x,
+                tolerance_z=tolerance_z,
+                tolerance_yaw=tolerance_yaw
+            )
             set_debug_var(f'{debug_prefix}_status', 'adjusting',
                           DebugLevel.INFO, DebugCategory.STATUS, f"正在调整位置对齐{task_name}")
 
@@ -252,18 +292,39 @@ def base_align_to_apriltag(
     target_tag_families: str,
     target_tag_id: Optional[int], 
     target_z: float,
-    debug_prefix: str, task_name: str,
     target_x: float = 0.0,
-    target_yaw: float = 0.0
+    target_yaw: float = 0.0,
+    tolerance_x: float = DEFAULT_TOLERANCE_XY,
+    tolerance_z: float = DEFAULT_TOLERANCE_XY,
+    tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
 ) -> bool:
+    """
+    基于AprilTag的底盘对齐函数
+    
+    轴方向说明（相机坐标系）：
+    - X轴：左右方向（左正右负）
+    - Y轴：上下方向（上正下负，本函数中不使用）
+    - Z轴：前后方向（远正近负）
+    - Yaw：平面旋转角度（逆时针正，顺时针负）
+    
+    参数说明：
+    - target_x: 目标X轴位置（左右偏移）
+    - target_z: 目标Z轴位置（前后距离）
+    - target_yaw: 目标Yaw角度（平面朝向）
+    - tolerance_x: X轴允许误差（左右容差）
+    - tolerance_z: Z轴允许误差（前后容差）
+    - tolerance_yaw: Yaw角度允许误差
+    """
     return AlignmentUtils.apriltag_alignment_loop(
         cam_key, 
         target_tag_families,
         target_tag_id, 
         target_z, 
-        debug_prefix, 
-        task_name,
+        debug_prefix="tag_align",
+        task_name="TagAlign",
         target_x=target_x,
-        target_yaw=target_yaw
+        target_yaw=target_yaw,
+        tolerance_x=tolerance_x,
+        tolerance_z=tolerance_z,
+        tolerance_yaw=tolerance_yaw
     )
-

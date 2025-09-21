@@ -241,17 +241,19 @@ def render_tasks_panel():
                                     task_choices,
                                     value=item['name'],
                                     label='任务类',
-                                    clearable=False
+                                    clearable=False,
+                                    on_change=lambda e: on_step_change(e.value)
                                 ).props('dense outlined').classes('w-56 shrink-0')
 
-                                def on_step_change(e, i=idx):
+                                def on_step_change(new_value, i=idx):
                                     if i < len(nodes_state):
-                                        # 获取更新后的值 
-                                        new_value = e if isinstance(e, str) else getattr(e, 'value', None)
-                                        nodes_state[i]['name'] = new_value
-                                        nodes_state[i]['parameters'] = {}
+                                        # 获取更新后的值 (改进的值获取逻辑)
+                                        if new_value is not None and new_value in task_choices:
+                                            nodes_state[i]['name'] = new_value
+                                            nodes_state[i]['parameters'] = {}
+                                        else:
+                                            pass  # 无法获取有效的任务节点名称，跳过更新
                                         _render_items()
-                                sel.on('update:model-value', on_step_change)
 
                                 param_widgets = {}
                                 step_name = item.get('name')
@@ -288,7 +290,8 @@ def render_tasks_panel():
                                     cond_choices,
                                     value=item.get('name'),
                                     label='条件类',
-                                    clearable=False
+                                    clearable=False,
+                                    on_change=lambda e: on_cond_change(e.value)
                                 ).props('dense outlined').classes('w-56 shrink-0')
                                 
                                 id_in = ui.input(
@@ -296,14 +299,14 @@ def render_tasks_panel():
                                     value=item.get('id', '')
                                 ).props('dense outlined size=sm').classes('w-56')
 
-                                def on_cond_change(e, i=idx):
+                                def on_cond_change(new_value, i=idx):
                                     if i < len(nodes_state):
-                                        # 获取更新后的值 (适用于最新版本的 NiceGUI)
-                                        new_value = e if isinstance(e, str) else getattr(e, 'value', None)
-                                        nodes_state[i]['name'] = new_value
-                                        nodes_state[i]['parameters'] = {}
+                                        if new_value is not None and new_value in cond_choices:
+                                            nodes_state[i]['name'] = new_value
+                                            nodes_state[i]['parameters'] = {}
+                                        else:
+                                            pass  # 无法获取有效的条件节点名称，跳过更新
                                         _render_items()
-                                sel.on('update:model-value', on_cond_change)
 
                                 param_widgets = {}
                                 cond_name = item.get('name')

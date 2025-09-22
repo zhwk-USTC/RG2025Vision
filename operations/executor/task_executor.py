@@ -120,6 +120,10 @@ class TaskExecutor:
                     next_idx = self._execute_condition_node(node_id, class_name, params, target_map)
                     i = next_idx if next_idx is not None else (i + 1)
 
+                elif node_type == 'note':
+                    self._execute_note_node(node_id, class_name, params)
+                    i += 1
+                    
                 elif node_type == 'target':
                     i += 1
 
@@ -252,6 +256,26 @@ class TaskExecutor:
             return None
 
         return target_idx
+    # ---------- 子步骤：注释（note）节点 ----------
+    def _execute_note_node(self, node_id: str, name: str, parameters: Dict[str, Any]) -> None:
+        text = parameters.get('text')
+        if text is None or text == '':
+            text = name or node_id
+        if not isinstance(text, str):
+            try:
+                text = repr(text)
+            except Exception:
+                text = str(text)
+
+        preview = text if len(text) <= 1000 else (text[:1000] + '…')
+        logger.info(f"[NOTE] {node_id}: {preview}")
+        set_debug_var(
+            f"note_{node_id}",
+            {"text": preview},
+            DebugLevel.INFO,
+            DebugCategory.STATUS,
+            f"注释节点 {node_id}"
+        )
 
 
 # ---- 全局执行器实例 ----

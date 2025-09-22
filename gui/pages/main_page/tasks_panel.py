@@ -95,15 +95,17 @@ def _create_param_input(param_name: str, param: inspect.Parameter, preset=None) 
 
 
 def _cfg_nodes_to_state(cfg):
-    """配置 -> UI 状态（task/condition/target）"""
+    """配置 -> UI 状态（task/condition/target/note）"""
     items = getattr(cfg, 'nodes', []) or []
     out = []
     for n in items:
         n_type = getattr(n, 'type', None)
         base = {'type': n_type, 'id': getattr(n, 'id', ''), 'name': getattr(n, 'name', '')}
-        if n_type in ('task', 'condition'):
+        # 这里把 note 加进“有 parameters 的类型”
+        if n_type in ('task', 'condition', 'note'):
             base['parameters'] = dict(getattr(n, 'parameters', {}) or {})
-        if n_type in ('task', 'condition', 'target'):
+        # 这里把 note 加进可加入的类型列表
+        if n_type in ('task', 'condition', 'target', 'note'):
             out.append(base)
     return out
 
@@ -195,7 +197,7 @@ def render_single_step_panel(ctx: UIPanelContext):
                     ctx.step_cards[step_name] = btn
                     btn.on('click', _on_click_run)
 
-    with ui.expansion('单步骤调试', icon='list_alt', value=True).classes('w-full mt-2'):
+    with ui.expansion('单步骤调试', icon='list_alt', value=False).classes('w-full mt-2'):
         ui.label('每个步骤可自定义参数；修改后点击“运行”').classes('text-sm text-gray-600 mb-2')
         with ui.grid(columns=1).classes('w-full gap-2 items-stretch'):
             for _step_name in _TASK_NODE_CLASSES.keys():
@@ -213,6 +215,7 @@ def render_flow_panel(ctx: UIPanelContext):
         'task':    {'border': 'border-blue-500',    'icon': 'play_arrow',   'icon_cls': 'text-blue-600',    'title_cls': 'text-blue-700'},
         'cond':    {'border': 'border-amber-500',   'icon': 'rule',         'icon_cls': 'text-amber-600',   'title_cls': 'text-amber-700'},
         'target':  {'border': 'border-emerald-500', 'icon': 'flag',         'icon_cls': 'text-emerald-600', 'title_cls': 'text-emerald-700'},
+        'note': {'border': 'border-violet-500', 'icon': 'sticky_note_2', 'icon_cls': 'text-violet-600', 'title_cls': 'text-violet-700'},
     }
 
     def _card_classes(kind: str) -> str:
@@ -427,6 +430,7 @@ def render_flow_panel(ctx: UIPanelContext):
     TYPE_TASK = 'task'
     TYPE_COND = 'condition'
     TYPE_TARGET = 'target'
+    TYPE_NOTE = 'note'
 
     task_choices = list(_TASK_NODE_CLASSES.keys())
     cond_choices = list(_COND_NODE_CLASSES.keys())
@@ -473,6 +477,11 @@ def render_flow_panel(ctx: UIPanelContext):
                             item.setdefault('parameters', {})[pname] = v
                 if '__id_input' in item and hasattr(item['__id_input'], 'value'):
                     item['id'] = item['__id_input'].value
+            elif itype == TYPE_NOTE:
+                if '__name_input' in item and hasattr(item['__name_input'], 'value'):
+                    item['name'] = item['__name_input'].value or ''
+                if '__text_input' in item and hasattr(item['__text_input'], 'value'):
+                    item.setdefault('parameters', {})['text'] = item['__text_input'].value or ''
 
     # ---- 下拉更新 ----
     def _on_task_change(new_value: str, i: int):
@@ -603,6 +612,39 @@ def render_flow_panel(ctx: UIPanelContext):
 
                     # 回写引用
                     item['__id_input_target'] = id_in
+                    
+    def _render_note_card(idx: int, item: dict):
+        kind = 'note'
+        note_id = item.get('id', '')
+        title = item.get('name', '')
+        text_val = (item.get('parameters') or {}).get('text', '')
+
+        with ui.card().classes(_card_classes(kind)):
+            with ui.card_section().classes('p-3'):
+                with ui.row().classes('items-center w-full gap-3 no-wrap'):
+                    ui.icon(STYLE[kind]['icon']).classes(STYLE[kind]['icon_cls'])
+                    ui.badge(str(idx + 1)).classes('shrink-0 text-base font-bold')
+                    _title_label('Note', kind)
+
+                    # # 标题（占用 name 字段，可选）
+                    # name_in = ui.input('标题（可选）', value=title)\
+                    #             .props('dense outlined size=sm').classes('w-56')
+
+                    # # 只读显示 ID（可不渲染，如不需要）
+                    # if note_id:
+                    #     ui.label(f'ID: {note_id}').classes('text-xs text-gray-500')
+
+                    # 正文内容
+                    text_in = ui.textarea('注释内容', value=text_val)\
+                                .props('dense outlined autogrow').classes('w-full min-h-[80px] mt-2')
+
+                    # 控制按钮（上/下/删）
+                    _render_controls(idx)
+
+                # 回写引用，供保存/状态回写使用
+                # item['__name_input'] = name_in
+                item['__text_input'] = text_in
+
 
 
     # ---- 列表渲染入口 ----
@@ -617,6 +659,8 @@ def render_flow_panel(ctx: UIPanelContext):
                     _render_cond_card(idx, item)
                 elif t == TYPE_TARGET:
                     _render_target_card(idx, item)
+                elif t == TYPE_NOTE:
+                    _render_note_card(idx, item)
                 else:
                     with ui.card().classes('w-full mb-2'):
                         with ui.card_section().classes('p-3'):
@@ -658,6 +702,16 @@ def render_flow_panel(ctx: UIPanelContext):
             'parameters': {},
         })
         ctx.nodes_state.append({'type': TYPE_TARGET, 'id': cid, 'name': 'TargetAnchor'})
+        _render_items()
+
+    def _add_note_item():
+        _save_current_values()
+        ctx.nodes_state.append({
+            'type': TYPE_NOTE,
+            'id': '',           # 可留空，保存时自动生成 note_{idx}
+            'name': '注释',      # 默认标题
+            'parameters': {'text': ''},
+        })
         _render_items()
 
     # ---- 保存配置 ----
@@ -722,6 +776,17 @@ def render_flow_panel(ctx: UIPanelContext):
                     new_nodes.append(OperationNodeConfig(type=TYPE_TARGET, id=t_id, name=t_name, parameters={}))
                     explicit_target_ids.add(t_id)
                 # else: 跳过无效 target（未找到同 id 的 condition）
+            elif t == TYPE_NOTE:
+                # 生成/读取 note 的 id（可留空，也可自动生成）
+                node_id = item.get('id') or f'note_{idx}'
+                # 标题（name）
+                name = getattr(item.get('__name_input'), 'value', item.get('name')) if item.get('__name_input') else item.get('name', '')
+                # 正文（parameters['text']）
+                text_val = getattr(item.get('__text_input'), 'value', (item.get('parameters') or {}).get('text', '')) \
+                        if item.get('__text_input') else (item.get('parameters') or {}).get('text', '')
+                params = {'text': text_val}
+                new_nodes.append(OperationNodeConfig(type=TYPE_NOTE, id=node_id, name=name, parameters=params)) # type: ignore
+
 
         # 为缺少显式 target 的 condition 自动补一个（在末尾）
         missing_ids = [cid for cid in all_cond_ids if cid not in explicit_target_ids]
@@ -747,6 +812,7 @@ def render_flow_panel(ctx: UIPanelContext):
     with ui.row().classes('gap-2 mt-1'):
         ui.button('新增任务节点', icon='add', on_click=_add_task_item).props('dense')
         ui.button('新增条件节点', icon='add_alert', on_click=_add_condition_item).props('dense')
+        ui.button('新增注释节点', icon='sticky_note_2', on_click=_add_note_item).props('dense')
         ui.button('保存配置', color='primary', icon='save', on_click=_save_items).props('dense')
 
     # 初次渲染

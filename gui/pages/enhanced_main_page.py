@@ -483,8 +483,52 @@ def render_tasks_panel():
     task_choices = list(_TASK_NODE_CLASSES.keys())
     cond_choices = list(_COND_NODE_CLASSES.keys())
 
+    def _save_current_values():
+        """在重新渲染前保存当前输入的参数值"""
+        for idx, item in enumerate(nodes_state):
+            if item.get('type') == 'task':
+                step_name = item.get('name')
+                if step_name and step_name in _TASK_NODE_CLASSES and '__param_widgets' in item:
+                    sig = inspect.signature(_TASK_NODE_CLASSES[step_name].__init__)
+                    current_params = item.setdefault('parameters', {})
+                    
+                    for pname, param in sig.parameters.items():
+                        if pname == 'self':
+                            continue
+                        widget = item['__param_widgets'].get(pname)
+                        if widget:
+                            default = param.default if param.default is not inspect._empty else None
+                            annot = param.annotation if param.annotation is not inspect._empty else type(default)
+                            value = _read_param_widget(widget, annot, default)
+                            if value is not None:
+                                current_params[pname] = value
+            
+            elif item.get('type') == 'condition':
+                cond_name = item.get('name')
+                if cond_name and cond_name in _COND_NODE_CLASSES and '__param_widgets' in item:
+                    sig = inspect.signature(_COND_NODE_CLASSES[cond_name].__init__)
+                    current_params = item.setdefault('parameters', {})
+                    
+                    for pname, param in sig.parameters.items():
+                        if pname == 'self':
+                            continue
+                        widget = item['__param_widgets'].get(pname)
+                        if widget:
+                            default = param.default if param.default is not inspect._empty else None
+                            annot = param.annotation if param.annotation is not inspect._empty else type(default)
+                            value = _read_param_widget(widget, annot, default)
+                            if value is not None:
+                                current_params[pname] = value
+                
+                # 同时保存ID值
+                if '__id_input' in item:
+                    id_widget = item['__id_input']
+                    if hasattr(id_widget, 'value'):
+                        item['id'] = id_widget.value
+
     def on_step_change(new_value, i):
         if i < len(nodes_state):
+            _save_current_values()  # 先保存当前值
             # 获取更新后的值 (改进的值获取逻辑)
             if new_value is not None and new_value in task_choices:
                 nodes_state[i]['name'] = new_value
@@ -495,6 +539,7 @@ def render_tasks_panel():
 
     def on_cond_change(new_value, i):
         if i < len(nodes_state):
+            _save_current_values()  # 先保存当前值
             if new_value is not None and new_value in cond_choices:
                 nodes_state[i]['name'] = new_value
                 nodes_state[i]['parameters'] = {}
@@ -627,19 +672,24 @@ def render_tasks_panel():
 
 
     def _move_up(i): 
+        _save_current_values()  # 保存当前值
         if i > 0: nodes_state[i-1], nodes_state[i] = nodes_state[i], nodes_state[i-1]
 
     def _move_down(i):
+        _save_current_values()  # 保存当前值
         if i < len(nodes_state) - 1: nodes_state[i+1], nodes_state[i] = nodes_state[i], nodes_state[i+1]
 
     def _delete(i):
+        _save_current_values()  # 保存当前值
         nodes_state.pop(i)
 
     def _add_task_item():
+        _save_current_values()  # 保存当前值
         nodes_state.append({'type': 'task', 'name': (next(iter(_TASK_NODE_CLASSES.keys()), '') if _TASK_NODE_CLASSES else ''), 'parameters': {}})
         _render_items()
 
     def _add_condition_item():
+        _save_current_values()  # 保存当前值
         next_idx = len([x for x in nodes_state if x.get('type') == 'condition']) + 1
         condition_id = f'cond_{next_idx}'
         
@@ -665,6 +715,8 @@ def render_tasks_panel():
         - 显式出现在 UI 的 target 节点按其位置保存
         - 若有 condition 没有对应 target，则在末尾自动补一个
         """
+        _save_current_values()  # 先保存当前输入的参数值
+        
         new_nodes: list[OperationNodeConfig] = []
         cond_ids: list[str] = []
         target_ids: list[str] = []
@@ -713,11 +765,14 @@ def render_tasks_panel():
                 cond_ids.append(node_id)
 
             elif itype == 'target':
-                # 显式保存 target（使用 UI 中的只读/可编辑输入）
+                # 只保存有对应条件的target节点
                 t_id = getattr(item.get('__id_input_target'), 'value', item.get('id', '')) if item.get('__id_input_target') else item.get('id', '')
                 t_name = getattr(item.get('__name_input_target'), 'value', item.get('name', 'TargetAnchor')) if item.get('__name_input_target') else item.get('name', 'TargetAnchor')
-                new_nodes.append(OperationNodeConfig(type='target', id=t_id, name=t_name, parameters={}))
-                target_ids.append(t_id)
+                
+                # 只有当存在对应的条件ID时才保存此target
+                if t_id in cond_ids:
+                    new_nodes.append(OperationNodeConfig(type='target', id=t_id, name=t_name, parameters={}))
+                    target_ids.append(t_id)
 
             # 其它类型忽略
 
@@ -726,12 +781,25 @@ def render_tasks_panel():
         for cid in missing:
             new_nodes.append(OperationNodeConfig(type='target', id=cid, name='TargetAnchor', parameters={}))
 
+        # 统计清理的无效target数量
+        original_target_count = len([x for x in nodes_state if x.get('type') == 'target'])
+        final_target_count = len([x for x in new_nodes if x.type == 'target'])
+        cleaned_count = original_target_count - final_target_count + len(missing)
+
         try:
             cfg.nodes = new_nodes
             save_current_operation(cfg)
             save_operation_manager()  # 确保管理器状态也被保存
+            
+            # 更详细的保存日志
+            messages = []
+            if cleaned_count > 0:
+                messages.append(f'清理了 {cleaned_count} 个无效target')
             if missing:
-                logger.warning(f'配置已保存；为 {len(missing)} 个条件自动补充 target')
+                messages.append(f'为 {len(missing)} 个条件自动补充target')
+            
+            if messages:
+                logger.info(f'配置已保存；{"; ".join(messages)}')
             else:
                 logger.info('配置已保存')
         except Exception as e:

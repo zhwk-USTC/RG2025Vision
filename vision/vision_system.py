@@ -23,11 +23,8 @@ class VisionSystemConfig:
         default_factory=dict)  # 存储相机内参等元信息
     tag36h11_detector: TagDetectionConfig = TagDetectionConfig(
         families='tag36h11')
-    tag36h11_size: Optional[float] = None  # 标签边长，单位米
-
     tag25h9_detector: TagDetectionConfig = TagDetectionConfig(
         families='tag25h9')
-    tag25h9_size: Optional[float] = None  # 标签边长，单位米
     hsv_detector: HSVDetectConfig = HSVDetectConfig()
 
 class VisionSystem:
@@ -42,9 +39,7 @@ class VisionSystem:
         self._latest_frames: Dict[str, Optional[np.ndarray]] = {}
         # ---------- Detection ----------
         self._tag36h11_detector: Tag36h11Detector = Tag36h11Detector()
-        self._tag36h11_size: Optional[float] = None  # 标签边长，单位米
         self._tag25h9_detector: Tag25h9Detector = Tag25h9Detector()
-        self._tag25h9_size: Optional[float] = None  # 标签边
         self._hsv_detector: HSVDetector = HSVDetector()
         self._localizer: SingleTagLocalizer = SingleTagLocalizer()
 
@@ -72,9 +67,6 @@ class VisionSystem:
                 self._hsv_detector = HSVDetector(
                     VisionSystemConfig.hsv_detector)
                 logger.info(f"[VisionSystem] 添加 HSV 检测器")
-
-                self._tag36h11_size = VisionSystemConfig.tag36h11_size
-                self._tag25h9_size = VisionSystemConfig.tag25h9_size
                 self._camera_intrinsics = VisionSystemConfig.camera_intrinsics
 
             # —— 兜底：确保 CAM_KEY_TYPE 都存在；没有就创建默认相机 ——
@@ -109,25 +101,21 @@ class VisionSystem:
     def get_latest_frame(self, key: CAM_KEY_TYPE) -> Optional[np.ndarray]:
         return self._latest_frames.get(key)
 
-    def detect_tag36h11(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], *, tag_size: Optional[float] = None) -> Optional[List[TagDetection]]:
+    def detect_tag36h11(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]) -> Optional[List[TagDetection]]:
         if frame is None:
             logger.error(f"[VisionSystem] detect_tag36h11 输入帧为空")
             return None
         detector = self._tag36h11_detector
-        if tag_size is None:
-            tag_size = self._tag36h11_size
 
         result = detector.detect(
             image=frame, intrinsics=intrinsics, tag_size=tag_size)
         return result
     
-    def detect_tag25h9(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], *, tag_size: Optional[float] = None) -> Optional[List[TagDetection]]:
+    def detect_tag25h9(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]) -> Optional[List[TagDetection]]:
         if frame is None:
             logger.error(f"[VisionSystem] detect_tag25h9 输入帧为空")
             return None
         detector = self._tag25h9_detector
-        if tag_size is None:
-            tag_size = self._tag25h9_size
 
         result = detector.detect(
             image=frame, intrinsics=intrinsics, tag_size=tag_size)
@@ -159,8 +147,6 @@ class VisionSystem:
             cameras=cams,
             camera_intrinsics=self._camera_intrinsics,
             tag36h11_detector=tag36h11_detector,
-            tag36h11_size=self._tag36h11_size,
             tag25h9_detector=self._tag25h9_detector.get_config(),
-            tag25h9_size=self._tag25h9_size,
             hsv_detector=hsv_detector,
         )

@@ -7,6 +7,7 @@ class BaseAlignToAprilTag:
     def __init__(self, 
                  cam_key: str, 
                  tag_id: int, 
+                 tag_size: float,
                  target_z: float, 
                  target_x: float,
                  target_yaw: float = 0.0,
@@ -16,6 +17,7 @@ class BaseAlignToAprilTag:
                  ):
         self.cam_key = cam_key
         self.tag_id = tag_id
+        self.tag_size = tag_size
         self.target_x = target_x
         self.target_z = target_z
         self.target_yaw = target_yaw
@@ -28,6 +30,7 @@ class BaseAlignToAprilTag:
             cam_key=self.cam_key,  # type: ignore
             target_tag_families='tag36h11',
             target_tag_id=self.tag_id,
+            target_tag_size=self.tag_size,
             target_z=self.target_z,
             target_x=self.target_x,
             target_yaw=self.target_yaw,

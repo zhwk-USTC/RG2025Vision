@@ -59,6 +59,7 @@ class VisionUtils:
         cam_key: CAM_KEY_TYPE,
         target_tag_families: str,
         target_tag_id: Optional[int] = None,
+        target_tag_size: Optional[float] = None,
         max_retries: int = 20,
         retry_delay: float = 0.05,
         debug_prefix: str = "tag",
@@ -80,11 +81,11 @@ class VisionUtils:
             if frame is None:
                 return None, None
 
-            intr = vs.get_camera_intrinsics(cam_key)  # type: ignore
+            intr = vs.get_camera_intrinsics(cam_key)
             if(target_tag_families == 'tag36h11'):
-                dets = vs.detect_tag36h11(frame, intr)
+                dets = vs.detect_tag36h11(frame, intr, target_tag_size)
             elif target_tag_families == 'tag25h9':
-                dets = vs.detect_tag25h9(frame, intr)
+                dets = vs.detect_tag25h9(frame, intr, target_tag_size)
             else:
                 set_debug_var(f'{debug_prefix}_error', 'unknown tag family', DebugLevel.ERROR, DebugCategory.ERROR, f"未知的标签族: {target_tag_families}")
                 return None, None

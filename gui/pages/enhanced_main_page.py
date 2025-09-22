@@ -483,6 +483,25 @@ def render_tasks_panel():
     task_choices = list(_TASK_NODE_CLASSES.keys())
     cond_choices = list(_COND_NODE_CLASSES.keys())
 
+    def on_step_change(new_value, i):
+        if i < len(nodes_state):
+            # 获取更新后的值 (改进的值获取逻辑)
+            if new_value is not None and new_value in task_choices:
+                nodes_state[i]['name'] = new_value
+                nodes_state[i]['parameters'] = {}
+            else:
+                pass  # 无法获取有效的任务节点名称，跳过更新
+            _render_items()
+
+    def on_cond_change(new_value, i):
+        if i < len(nodes_state):
+            if new_value is not None and new_value in cond_choices:
+                nodes_state[i]['name'] = new_value
+                nodes_state[i]['parameters'] = {}
+            else:
+                pass  # 无法获取有效的条件节点名称，跳过更新
+            _render_items()
+
     def _render_items():
         items_container.clear()
         for idx, item in enumerate(nodes_state):
@@ -500,18 +519,8 @@ def render_tasks_panel():
                                     value=item['name'],
                                     label='任务',
                                     clearable=False,
-                                    on_change=lambda e: on_step_change(e.value)
+                                    on_change=lambda e, i=idx: on_step_change(e.value, i)
                                 ).props('dense outlined').classes('w-56 shrink-0')
-
-                                def on_step_change(new_value, i=idx):
-                                    if i < len(nodes_state):
-                                        # 获取更新后的值 (改进的值获取逻辑)
-                                        if new_value is not None and new_value in task_choices:
-                                            nodes_state[i]['name'] = new_value
-                                            nodes_state[i]['parameters'] = {}
-                                        else:
-                                            pass  # 无法获取有效的任务节点名称，跳过更新
-                                        _render_items()
 
                                 param_widgets = {}
                                 step_name = item.get('name')
@@ -549,22 +558,13 @@ def render_tasks_panel():
                                     value=item.get('name'),
                                     label='条件',
                                     clearable=False,
-                                    on_change=lambda e: on_cond_change(e.value)
+                                    on_change=lambda e, i=idx: on_cond_change(e.value, i)
                                 ).props('dense outlined').classes('w-56 shrink-0')
                                 
                                 id_in = ui.input(
                                     '节点 ID（与 target 同 id）',
                                     value=item.get('id', '')
                                 ).props('dense outlined size=sm').classes('w-56')
-
-                                def on_cond_change(new_value, i=idx):
-                                    if i < len(nodes_state):
-                                        if new_value is not None and new_value in cond_choices:
-                                            nodes_state[i]['name'] = new_value
-                                            nodes_state[i]['parameters'] = {}
-                                        else:
-                                            pass  # 无法获取有效的条件节点名称，跳过更新
-                                        _render_items()
 
                                 param_widgets = {}
                                 cond_name = item.get('name')

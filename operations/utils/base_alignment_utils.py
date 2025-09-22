@@ -20,8 +20,12 @@ DEFAULT_TOLERANCE_XY = 0.005
 # 角度误差阈值（弧度）
 DEFAULT_TOLERANCE_YAW = 0.01
 
-# 允许旋转的位移门槛：只有当 |e_x|、|e_y| 都小于该值才会旋转
-ROT_GATE_XY = 0.08  # m
+# 允许旋转的位移门槛：动态计算，基于容差和角度误差
+ROT_GATE_TOLERANCE_MULTIPLIER = 10.0  # 基础门槛为容差的倍数
+ROT_GATE_ANGLE_SCALE = 0.5  # 角度误差对门槛的影响系数
+
+# 角度优先策略：当角度误差超过该阈值时，优先处理角度而非位置
+ANGLE_PRIORITY_THRESHOLD = 0.15  # rad (约8.6度)，超过此值时角度优先
 
 # 平移脉冲最小/最大时长（秒）
 MOVE_PULSE_MIN_SEC = 0.05
@@ -48,6 +52,44 @@ class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
     YAW_SIGN: int = -1
+
+    @staticmethod
+    def _calculate_rotation_gate(e_yaw: float, tolerance_x: float, tolerance_z: float) -> float:
+        """
+        动态计算旋转门槛，考虑摄像头偏心导致的旋转-平移耦合
+        
+        设计理念：
+        - 摄像头不在车辆中心时，旋转会产生额外的平移误差
+        - 门槛应该基于实际的位置容差，而不是固定值
+        - 角度误差越大，允许的位置误差门槛也相应放宽
+        
+        参数:
+            e_yaw: 当前角度误差（弧度）
+            tolerance_x: X轴位置容差（米）
+            tolerance_z: Z轴位置容差（米）
+            
+        返回:
+            动态计算的位置门槛值（米）
+            
+        计算公式:
+            base_gate = max(tolerance_x, tolerance_z) * multiplier
+            dynamic_gate = base_gate + |angle_error| * scale
+            确保门槛与实际容差成正比，同时考虑角度误差影响
+        """
+        import math
+        # 基础门槛：取两个容差的最大值，再乘以倍数
+        base_tolerance = max(tolerance_x, tolerance_z)
+        base_gate = base_tolerance * ROT_GATE_TOLERANCE_MULTIPLIER
+        
+        # 根据角度误差动态调整
+        angle_adjustment = abs(e_yaw) * ROT_GATE_ANGLE_SCALE
+        dynamic_gate = base_gate + angle_adjustment
+        
+        # 设置合理的上下限
+        min_gate = base_tolerance * 2  # 至少是容差的2倍
+        max_gate = base_tolerance * 30  # 最多是容差的30倍
+        
+        return max(min_gate, min(dynamic_gate, max_gate))
 
     @staticmethod
     def _sleep_and_stop(pulse_sec: float):
@@ -185,23 +227,41 @@ class AlignmentUtils:
         tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
     ):
         """
-        简化调度：
-        - 只要线性误差超过容差，就做一次平移微调（动态脉冲）
-        - 仅当两轴线性误差都很小且角度超容差时才旋转（动态脉冲）
-        - 其余情况停止
+        智能调度策略：
+        - 角度误差较大时（>ANGLE_PRIORITY_THRESHOLD），优先处理角度
+        - 角度误差较小时，优先处理位置，位置对齐后再处理角度
+        - 避免在错误朝向下进行位置调整，提高对齐效率
         """
         # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
         x_aligned = abs(e_y) <= tolerance_x  # 左右对齐
         z_aligned = abs(e_x) <= tolerance_z  # 前后对齐
+        yaw_aligned = abs(e_yaw) <= tolerance_yaw  # 角度对齐
         
+        # 策略1: 角度误差很大时，优先处理角度（避免在错误朝向下调位置）
+        if abs(e_yaw) > ANGLE_PRIORITY_THRESHOLD:
+            # 使用放宽的门槛允许在较大位置误差下旋转
+            rotation_gate = AlignmentUtils._calculate_rotation_gate(e_yaw, tolerance_x, tolerance_z)
+            if abs(e_x) <= rotation_gate and abs(e_y) <= rotation_gate:
+                AlignmentUtils._rotate_discrete(e_yaw, tolerance_yaw)
+                return
+            # 如果位置误差太大连放宽门槛都不满足，先粗调位置
+            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
+            return
+        
+        # 策略2: 角度误差不大时，按传统方式先位置后角度
         if not (x_aligned and z_aligned):
             AlignmentUtils._move_discrete(e_x, e_y, cam_key)
             return
 
-        if x_aligned and z_aligned and abs(e_yaw) > tolerance_yaw:
-            # 只有当位置都对齐且在旋转门槛内时才旋转
-            if abs(e_x) <= ROT_GATE_XY and abs(e_y) <= ROT_GATE_XY:
+        if not yaw_aligned:
+            # 位置已对齐，进行精细角度调整
+            rotation_gate = AlignmentUtils._calculate_rotation_gate(e_yaw, tolerance_x, tolerance_z)
+            if abs(e_x) <= rotation_gate and abs(e_y) <= rotation_gate:
                 AlignmentUtils._rotate_discrete(e_yaw, tolerance_yaw)
+                return
+            else:
+                # 位置虽然在容差内，但超过了旋转门槛，需要进一步缩小位置误差
+                AlignmentUtils._move_discrete(e_x, e_y, cam_key)
                 return
 
         base_stop()

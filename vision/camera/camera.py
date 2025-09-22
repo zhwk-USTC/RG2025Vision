@@ -24,24 +24,12 @@ class CameraConfig:
     # 暴光相关
     auto_exposure_off: Optional[bool] = None   # True 表示尝试关闭 AE
     exposure: Optional[float] = None           # 直接写入 CAP_PROP_EXPOSURE 的值（平台相关）
-    exposure_ms: Optional[float] = None        # 以毫秒指定曝光时间，内部做 Win/V4L2 双路径尝试
     gain: Optional[float] = None               # 增益
 
     # 白平衡
     auto_wb_off: Optional[bool] = None         # True 表示关闭自动白平衡
     wb_temperature: Optional[int] = None       # 色温（K）
 
-    # 对焦
-    autofocus_off: Optional[bool] = None       # True 表示关闭 AF
-    focus: Optional[float] = None              # 手动对焦刻度（范围看设备）
-
-    # 画质
-    brightness: Optional[float] = None
-    contrast: Optional[float] = None
-    saturation: Optional[float] = None
-    hue: Optional[float] = None
-    sharpness: Optional[float] = None
-    gamma: Optional[float] = None
 
 
 class Camera:
@@ -118,9 +106,6 @@ class Camera:
         """
         曝光的跨平台设置：
         - 若提供 exposure（原始值），直接写入 CAP_PROP_EXPOSURE。
-        - 若提供 exposure_ms（毫秒），尝试两种主流语义：
-            1) Windows/MediaFoundation: 以 log2(秒) 表示（如 -6≈1/64s）
-            2) Linux/V4L2: 近似 100 微秒为 1 单位（8ms≈80）
         """
         if self._config.auto_exposure_off:
             # 不同后端语义各异：0/1 或 0.25/0.75；这里都试一下“关闭自动”
@@ -130,20 +115,10 @@ class Camera:
         if self._config.exposure is not None:
             self._try_set(cv2.CAP_PROP_EXPOSURE, self._config.exposure, "EXPOSURE(raw)")
 
-        # 按毫秒设定，做 Win/V4L2 双路径尝试
-        if self._config.exposure_ms is not None:
-            ms = max(self._config.exposure_ms, 0.05)  # 防止 log2(0)
-            # Win 风格：log2(秒)
-            log2_sec = math.log(ms / 1000.0, 2)
-            self._try_set(cv2.CAP_PROP_EXPOSURE, log2_sec, "EXPOSURE(Win log2(s))")
-            # V4L2 风格：100us 单位
-            v4l2_units = int(round(ms / 0.1))  # 0.1ms = 100us
-            self._try_set(cv2.CAP_PROP_EXPOSURE, v4l2_units, "EXPOSURE(V4L2 100us units)")
         
         # 如果没有设置任何手动曝光参数且未明确关闭自动曝光，则恢复自动曝光
         if (not self._config.auto_exposure_off and 
-            self._config.exposure is None and 
-            self._config.exposure_ms is None):
+            self._config.exposure is None):
             # 不同后端语义各异：0.75/1 或其他值表示"开启自动"
             self._try_set_multi(cv2.CAP_PROP_AUTO_EXPOSURE, [0.75, 1, 3], "AUTO_EXPOSURE(恢复自动)")
 
@@ -170,42 +145,6 @@ class Camera:
 
         # ---- 2) 曝光/增益（先关自动再设值）----
         self._set_exposure_smart()
-
-        # # ---- 3) 白平衡（智能设置）----
-        # if self._config.auto_wb_off or self._config.wb_temperature is not None:
-        #     # 需要手动白平衡时，关闭自动白平衡
-        #     if self._config.auto_wb_off:
-        #         self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [0, 0.0], "AUTO_WB(关闭)")
-        #     if self._config.wb_temperature is not None:
-        #         self._try_set(cv2.CAP_PROP_WB_TEMPERATURE, int(self._config.wb_temperature), "WB_TEMPERATURE")
-        # else:
-        #     # 不使用手动白平衡时，恢复自动白平衡
-        #     self._try_set_multi(cv2.CAP_PROP_AUTO_WB, [1, 1.0], "AUTO_WB(恢复自动)")
-
-        # # ---- 4) 对焦（智能设置）----
-        # if self._config.autofocus_off or self._config.focus is not None:
-        #     # 需要手动对焦时，关闭自动对焦
-        #     if self._config.autofocus_off:
-        #         self._try_set(cv2.CAP_PROP_AUTOFOCUS, 0, "AUTOFOCUS(关闭)")
-        #     if self._config.focus is not None:
-        #         self._try_set(cv2.CAP_PROP_FOCUS, float(self._config.focus), "FOCUS")
-        # else:
-        #     # 不使用手动对焦时，恢复自动对焦
-        #     self._try_set(cv2.CAP_PROP_AUTOFOCUS, 1, "AUTOFOCUS(恢复自动)")
-
-        # # ---- 5) 画质类 ----
-        # if self._config.brightness is not None:
-        #     self._try_set(cv2.CAP_PROP_BRIGHTNESS, self._config.brightness, "BRIGHTNESS")
-        # if self._config.contrast is not None:
-        #     self._try_set(cv2.CAP_PROP_CONTRAST, self._config.contrast, "CONTRAST")
-        # if self._config.saturation is not None:
-        #     self._try_set(cv2.CAP_PROP_SATURATION, self._config.saturation, "SATURATION")
-        # if self._config.hue is not None:
-        #     self._try_set(cv2.CAP_PROP_HUE, self._config.hue, "HUE")
-        # if self._config.sharpness is not None:
-        #     self._try_set(cv2.CAP_PROP_SHARPNESS, self._config.sharpness, "SHARPNESS")
-        # if self._config.gamma is not None:
-        #     self._try_set(cv2.CAP_PROP_GAMMA, self._config.gamma, "GAMMA")
 
         # 回读并更新实际生效的宽高/FPS
         real_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or (self.width or 0)
@@ -322,18 +261,9 @@ class Camera:
             buffersize=self._config.buffersize,
             auto_exposure_off=self._config.auto_exposure_off,
             exposure=self._config.exposure,
-            exposure_ms=self._config.exposure_ms,
             gain=self._config.gain,
             auto_wb_off=self._config.auto_wb_off,
             wb_temperature=self._config.wb_temperature,
-            autofocus_off=self._config.autofocus_off,
-            focus=self._config.focus,
-            brightness=self._config.brightness,
-            contrast=self._config.contrast,
-            saturation=self._config.saturation,
-            hue=self._config.hue,
-            sharpness=self._config.sharpness,
-            gamma=self._config.gamma,
         )
 
     def __str__(self) -> str:

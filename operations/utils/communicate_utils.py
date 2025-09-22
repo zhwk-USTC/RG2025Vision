@@ -1,4 +1,5 @@
-from communicate import Var, send_kv, get_latest_decoded
+from communicate import Var, send_kv, get_latest_decoded, VAR_META
+from communicate.protocol.protocol_py.data import _as_float32_le, _unpack_fixed_le_int
 import time
 from time import sleep
 from typing import Literal, Optional
@@ -16,38 +17,59 @@ def wait_for_ack(var: Var, expected_value: int, timeout: float = -1) -> bool:
     Returns:
         bool: True表示收到确认，False表示超时
     """
+    # 使用wait_for_value获取实际值
+    actual_value = wait_for_value(var, timeout if timeout > 0 else 10.0)  # 默认10秒超时
+    
+    # 检查是否匹配期望值
+    if actual_value is not None and actual_value == expected_value:
+        return True
+    return False
+
+
+def wait_for_value(var: Var, timeout: float = 5.0):
+    """
+    等待指定变量的值并返回
+    使用communicate模块的解析函数和变量元数据
+    
+    Args:
+        var: 要等待的变量
+        timeout: 超时时间（秒）
+    
+    Returns:
+        解析后的值，如果超时则返回None
+    """
     start_time = time.time()
     
     while True:
-        # 获取最新接收到的数据包
         packet = get_latest_decoded()
-        
         if packet is not None and isinstance(packet, DataPacket):
-            # 遍历数据包中的所有TLV项
             for tlv in packet.tlvs:
                 if tlv.t == var:
-                    # 解析变量值
-                    if len(tlv.v) == 1:  # BOOL/U8类型
-                        value = int.from_bytes(tlv.v, 'little')
-                    elif len(tlv.v) == 2:  # U16类型
-                        value = int.from_bytes(tlv.v, 'little')
-                    elif len(tlv.v) == 4:  # U32/F32类型
-                        value = int.from_bytes(tlv.v, 'little')
-                    else:
-                        continue
+                    # 使用VAR_META获取变量类型信息
+                    var_meta = VAR_META.get(int(var))
+                    if var_meta is None:
+                        # 如果没有元数据，回退到基本解析
+                        return None
                     
-                    if value == expected_value:
-                        return True
+                    vtype = var_meta.get("vtype")
+                    if vtype is None:
+                        return _unpack_fixed_le_int(tlv.v)
+                    
+                    # 根据变量类型使用对应的解析函数
+                    if vtype == "F32":
+                        return _as_float32_le(tlv.v)
+                    elif vtype in ["BOOL", "U8", "U16", "U32"]:
+                        return _unpack_fixed_le_int(tlv.v)
+                    else:
+                        # 未知类型，使用基本解析
+                        return None
         
-        # 检查超时
-        if timeout > 0:
-            elapsed = time.time() - start_time
-            if elapsed >= timeout:
-                return False
-        
-        # 短暂休眠避免过度占用CPU
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            return None
         sleep(0.1)
 
+# --- 底盘相关 ---
 
 def base_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'backward_slow', 'left_fast', 'left_slow', 'right_fast', 'right_slow']):
     match dir:
@@ -68,9 +90,6 @@ def base_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'bac
         case 'right_slow':
             send_kv({Var.BASE_MOVE_RIGHT_SLOW: True})
             
-def base_stop():
-    send_kv({Var.BASE_STOP: True})
-
 def base_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
     match dir:
         case 'cw_fast':
@@ -81,22 +100,36 @@ def base_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
             send_kv({Var.BASE_ROTATE_CCW_FAST: True})
         case 'ccw_slow':
             send_kv({Var.BASE_ROTATE_CCW_SLOW: True})
+            
+def base_stop():
+    send_kv({Var.BASE_STOP: True})
+    
+def imu_reset():
+    send_kv({Var.IMU_RESET: True})
+    wait_for_ack(Var.OK, int(Var.IMU_RESET), 10)
+    
+def imu_get_yaw() -> Optional[float]:
+    """获取IMU的yaw角度值"""
+    send_kv({Var.GET_IMU_YAW: True})
+    return wait_for_value(Var.IMU_YAW, timeout=5.0)
+
+
 
 def arm_reset():
     send_kv({Var.ARM_RESET: True})
-    wait_for_ack(Var.OK,Var.ARM_RESET, 10)
+    wait_for_ack(Var.OK, int(Var.ARM_RESET), 10)
     
 def arm_reset_to_prepare():
     send_kv({Var.ARM_RESET_TO_PREPARE:True})
-    wait_for_ack(Var.OK,Var.ARM_RESET_TO_PREPARE, 10)
+    wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_PREPARE), 10)
 
 def arm_grasp_dart():
     send_kv({Var.ARM_GRASP_DART: True})
-    wait_for_ack(Var.OK,Var.ARM_GRASP_DART, 10)
+    wait_for_ack(Var.OK, int(Var.ARM_GRASP_DART), 10)
 
 def arm_load_dart():
     send_kv({Var.ARM_LOAD_DART: True})
-    wait_for_ack(Var.OK,Var.ARM_LOAD_DART, 30)
+    wait_for_ack(Var.OK, int(Var.ARM_LOAD_DART), 30)
 
 def arm_relax():
     send_kv({Var.ARM_RELAX: True})
@@ -106,13 +139,13 @@ def set_fire_speed(speed: float):
     
 def fire_once():
     send_kv({Var.FIRE_ONCE:True})
-    wait_for_ack(Var.OK,Var.FIRE_ONCE, 30)
+    wait_for_ack(Var.OK, int(Var.FIRE_ONCE), 30)
 
 # --- 炮台相关 ---
 def set_turret_yaw(angle: float):
     # 确保角度在有效范围内
     angle = max(-1.0, min(1.0, angle))
     send_kv({Var.TURRET_ANGLE_YAW: angle})
-    time.sleep(0.5)  # 等待炮台转动到位
+    time.sleep(1.0)  # 等待炮台转动到位
 
 

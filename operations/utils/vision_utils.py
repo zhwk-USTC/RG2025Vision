@@ -132,3 +132,83 @@ class VisionUtils:
             return det, pose
 
         return None, None
+
+    @staticmethod
+    def detect_hsv_with_retry(
+        cam_key: CAM_KEY_TYPE,
+        target_label: str,
+        max_retries: int = 20,
+        interval_sec: float = 0.05,
+        debug_prefix: str = "hsv",
+        task_name: str = "HSV检测"
+    ):
+        """
+        HSV颜色检测带重试功能
+        
+        Args:
+            cam_key: 摄像头键值
+            target_label: 目标HSV标签名称
+            max_retries: 最大重试次数
+            interval_sec: 重试间隔（秒）
+            debug_prefix: 调试变量前缀
+            task_name: 任务名称（用于日志）
+            
+        Returns:
+            tuple: (detection_result, None) 如果检测成功，否则 (None, None)
+                   detection_result 包含 center 属性表示检测到的中心像素坐标
+        """
+        vs = get_vision()
+        if not vs:
+            set_debug_var(f'{debug_prefix}_error', 'vision not ready', DebugLevel.ERROR, DebugCategory.ERROR, "视觉系统未准备就绪")
+            return None, None
+
+        iter_cnt = 0
+        while iter_cnt <= max_retries:
+            frame = VisionUtils.get_frame_safely(
+                cam_key,
+                f'{debug_prefix}_error',
+                f'{debug_prefix}_frame',
+                f"{task_name}时的相机帧"
+            )
+            if frame is None:
+                return None, None
+
+            try:
+                # 调用视觉系统的HSV检测方法
+                dets = vs.detect_hsv(frame)
+                
+                set_debug_var(f'{debug_prefix}_detections', len(dets) if dets else 0,
+                              DebugLevel.INFO, DebugCategory.DETECTION, f"检测到的{task_name}目标数量")
+
+                if not dets:
+                    if iter_cnt >= max_retries:
+                        logger.error(f"[{task_name}] 未检测到HSV目标: {target_label}")
+                        set_debug_var(f'{debug_prefix}_error', f'no hsv target found: {target_label}',
+                                      DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{task_name}目标")
+                        return None, None
+                    iter_cnt += 1
+                    time.sleep(interval_sec)
+                    continue
+
+                # 选择检测结果（通常选择面积最大的或置信度最高的）
+                if isinstance(dets, list) and len(dets) > 0:
+                    # 选择得分最高的检测结果
+                    det = max(dets, key=lambda d: getattr(d, 'score', 0))
+                else:
+                    det = dets
+
+                set_debug_var(f'{debug_prefix}_center', getattr(det, 'center', None),
+                              DebugLevel.INFO, DebugCategory.DETECTION, f"{task_name}检测到的中心坐标")
+
+                return det, None
+
+            except Exception as e:
+                logger.error(f"[{task_name}] HSV检测异常: {str(e)}")
+                set_debug_var(f'{debug_prefix}_error', f'hsv detection error: {str(e)}',
+                              DebugLevel.ERROR, DebugCategory.ERROR, f"{task_name}检测异常")
+                if iter_cnt >= max_retries:
+                    return None, None
+                iter_cnt += 1
+                time.sleep(interval_sec)
+
+        return None, None

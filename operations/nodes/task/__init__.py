@@ -4,10 +4,11 @@ from .base_align_to_apriltag import BaseAlignToAprilTag
 from .base.base_move import BaseMove
 from .base.base_rotate import BaseRotate
 from .base.base_stop import BaseStop
-from .armcontrol import ArmReset, ArmPrepare, ArmGrasp, ArmLoad, ArmGraspAndLoad
+from .arm import ArmReset, ArmPrepare, ArmGrasp, ArmLoad, ArmGraspAndLoad
 from .fire_control import FireControl
 from .system_cleanup import SystemCleanup
 from .system_init import SystemInit
+from .turret_align_to_light import TurretAlignToLight
 
 # 汇总所有任务节点类
 _TASK_NODE_CLASSES = {
@@ -25,4 +26,5 @@ _TASK_NODE_CLASSES = {
     'fire_control': FireControl,
     'system_cleanup': SystemCleanup,
     'system_init': SystemInit,
+    'turret_align_to_light': TurretAlignToLight,
 }

@@ -30,7 +30,7 @@ def render_nav_drawer():
 @ui.page('/')
 def main_page():
     render_nav_drawer()
-    render_enhanced_main_page()
+    render_main_page()
 
 @ui.page('/debug')
 def debug_page():

@@ -68,6 +68,9 @@ class TaskExecutor:
         global _stop_requested
         _stop_requested = False  # 每次执行前重置
 
+        # 每次执行前重置执行上下文，确保状态不会跨执行保留
+        self.execution_context.clear()
+
         self.load_from_config()
         if not self.flow:
             logger.error("没有可执行的流程配置")

@@ -4,6 +4,7 @@ from .base_align_to_apriltag import BaseAlignToAprilTag
 from .base.base_move import BaseMove
 from .base.base_rotate import BaseRotate
 from .base.base_stop import BaseStop
+from .base_rotate_by_angle import BaseRotateByAngle
 from .arm import ArmReset, ArmPrepare, ArmGrasp, ArmLoad, ArmGraspAndLoad
 from .fire_control import FireControl
 from .system_cleanup import SystemCleanup
@@ -19,6 +20,7 @@ _TASK_NODE_CLASSES = {
     'base_move': BaseMove,
     'base_rotate': BaseRotate,
     'base_stop': BaseStop,
+    'base_rotate_by_angle': BaseRotateByAngle,
     'arm_reset': ArmReset,
     'arm_prepare': ArmPrepare,
     'arm_grasp': ArmGrasp,

@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from core.logger import logger
 from ..debug_vars_enhanced import reset_debug_vars, set_debug_var, DebugLevel, DebugCategory
 from ..nodes import _TASK_NODE_CLASSES, _COND_NODE_CLASSES
-from core.config.operation_config import OperationNodeConfig
+from operations.config.operation_config import OperationNodeConfig
 
 
 class TaskStoppedException(Exception):
@@ -55,8 +55,8 @@ class TaskExecutor:
     def load_from_config(self):
         """从配置文件加载执行流程"""
         try:
-            from core.config.operation_config import load_operation_config
-            config = load_operation_config()
+            from operations.config.operation_config import get_current_operation
+            config = get_current_operation()
             # 读取 nodes
             self.flow = list(config.nodes) if getattr(config, "nodes", None) else []
         except Exception as e:
@@ -85,6 +85,8 @@ class TaskExecutor:
             if getattr(n, "id", None) and getattr(n, "type", None) == "target"
         }
 
+        has_failed_tasks = False  # 跟踪是否有任务失败
+
         try:
             i = 0
             while i < len(self.flow):
@@ -105,9 +107,10 @@ class TaskExecutor:
                     self.execution_context[node_id] = ok
                     self.execution_context['last_result'] = ok
                     if not ok:
-                        set_debug_var('task_failed', node_id, DebugLevel.ERROR, DebugCategory.ERROR,
-                                      f"任务节点 {node_id} 执行失败")
-                        return False
+                        has_failed_tasks = True
+                        set_debug_var('task_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
+                                      f"任务节点 {node_id} 执行失败，继续下一个任务")
+                        logger.warning(f"任务节点 {node_id} 执行失败，继续执行下一个任务")
                     i += 1
 
                 elif node_type == 'condition':
@@ -121,10 +124,17 @@ class TaskExecutor:
                     logger.warning(f"未知节点类型: {node_type}")
                     i += 1
 
-            set_debug_var('task_process_status', 'completed_normally',
-                          DebugLevel.SUCCESS, DebugCategory.STATUS,
-                          f"任务流程正常完成：共处理 {len(self.flow)} 个节点")
-            return True
+            if has_failed_tasks:
+                set_debug_var('task_process_status', 'completed_with_failures',
+                              DebugLevel.WARNING, DebugCategory.STATUS,
+                              f"任务流程完成但有失败任务：共处理 {len(self.flow)} 个节点")
+                logger.warning("任务流程完成，但存在失败的任务")
+                return False
+            else:
+                set_debug_var('task_process_status', 'completed_normally',
+                              DebugLevel.SUCCESS, DebugCategory.STATUS,
+                              f"任务流程正常完成：共处理 {len(self.flow)} 个节点")
+                return True
 
         except TaskStoppedException as e:
             set_debug_var('task_process_status', f'stopped: {e}', DebugLevel.WARNING, DebugCategory.STATUS,

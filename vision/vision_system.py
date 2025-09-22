@@ -13,7 +13,7 @@ from .detection.types import CameraIntrinsics
 from .localization.types import TagPose, CameraPose
 from .localization.simple_localizer import SingleTagLocalizer
 
-CAM_KEY_TYPE = Literal["front", "front_dark", "left", "gripper"]
+CAM_KEY_TYPE = Literal["front", "left", "gripper"]
 
 @dataclass
 class VisionSystemConfig:
@@ -78,7 +78,7 @@ class VisionSystem:
                 self._camera_intrinsics = VisionSystemConfig.camera_intrinsics
 
             # —— 兜底：确保 CAM_KEY_TYPE 都存在；没有就创建默认相机 ——
-            required_keys = {"front", "front_dark", "left", "gripper"}
+            required_keys = {"front", "left", "gripper"}
             for k in required_keys:
                 if k not in self._cameras:
                     default_cfg = CameraConfig(

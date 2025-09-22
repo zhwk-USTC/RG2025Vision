@@ -19,10 +19,17 @@ from operations.debug_vars_enhanced import (
 from gui.utils import get_empty_img, prepare_image_for_display
 
 # 配置
-from core.config.operation_config import (
-    load_operation_config,
-    save_operation_config,
+from operations.config.operation_config import (
+    get_current_operation,
+    save_current_operation,
+    add_operation,
+    remove_operation,
     OperationNodeConfig,
+    OperationConfig,
+    set_current_operation,
+    list_available_operations,
+    get_operation_manager,
+    save_operation_manager,
 )
 
 import threading
@@ -61,7 +68,7 @@ def render_enhanced_main_page():
 def render_tasks_panel():
     ui.markdown('## 控制面板')
 
-    cfg = load_operation_config()
+    cfg = get_current_operation()
 
     # UI 内存态：仅编辑 task/condition；target 在保存时按 condition 的 id 自动生成
     def _cfg_nodes_to_state():
@@ -218,7 +225,258 @@ def render_tasks_panel():
                 _render_single_task_card(_step_name)
     # ---------- 顺序配置（task / condition；target 自动生成） ----------
     ui.separator().classes('my-3')
-    ui.label('任务配置（顺序与参数）').classes('text-md font-bold text-blue-600')
+    
+    # ---------- 流程管理UI ----------
+    ui.label('工作流程管理').classes('text-md font-bold text-green-600')
+    
+    # 当前流程状态
+    current_operation_state = {'value': ''}
+    
+    def refresh_current_operation():
+        """刷新当前流程显示"""
+        # 确保至少有一个默认流程
+        available_ops = list_available_operations()
+        if not available_ops:
+            # 创建默认流程
+            default_config = OperationConfig(name="默认流程", description="系统默认工作流程")
+            add_operation("默认流程", default_config)
+            set_current_operation("默认流程")
+            save_operation_manager()
+            logger.info("已创建默认工作流程")
+        
+        cfg = get_current_operation()
+        current_operation_state['value'] = cfg.name
+    
+    # 初始化当前流程状态
+    refresh_current_operation()
+    
+    with ui.row().classes('items-center gap-3 mb-3'):
+        # 流程选择下拉框
+        available_ops = list_available_operations()
+        
+        # 确定默认选择值
+        default_value = None
+        if available_ops:
+            if current_operation_state['value'] in available_ops:
+                default_value = current_operation_state['value']
+            else:
+                default_value = available_ops[0]
+        
+        operation_select = ui.select(
+            available_ops,
+            value=default_value,
+            label='选择工作流程',
+            on_change=lambda e: on_operation_change(e.value)
+        ).props('dense outlined').classes('w-64')  # 移除clearable避免空值问题
+        
+        def on_operation_change(new_value):
+            """切换工作流程"""
+            if new_value and new_value in available_ops and set_current_operation(new_value):
+                current_operation_state['value'] = new_value
+                refresh_operation_config()
+                logger.info(f'已切换到工作流程: {new_value}')
+            elif new_value:
+                logger.warning(f'切换工作流程失败: {new_value}')
+            # 如果new_value为None，则不做任何操作
+        
+        # 新建流程按钮
+        ui.button('新建流程', icon='add', on_click=lambda: show_create_operation_dialog()).props('dense')
+        
+        # 删除流程按钮  
+        ui.button('删除当前流程', icon='delete', color='negative', on_click=lambda: delete_current_operation()).props('dense')
+        
+        # 复制流程按钮
+        ui.button('复制流程', icon='content_copy', on_click=lambda: show_copy_operation_dialog()).props('dense')
+    
+    # 当前流程信息显示
+    current_info_container = ui.row().classes('mb-3 p-2 bg-blue-50 rounded')
+    
+    def refresh_operation_info():
+        """刷新流程信息显示"""
+        current_info_container.clear()
+        with current_info_container:
+            cfg = get_current_operation()
+            ui.icon('info').classes('text-blue-600')
+            ui.label(f'当前流程: {cfg.name}').classes('font-medium text-blue-800')
+            if cfg.description:
+                ui.label(f'描述: {cfg.description}').classes('text-sm text-blue-600 ml-2')
+            nodes_count = len(getattr(cfg, 'nodes', []) or [])
+            ui.label(f'节点数: {nodes_count}').classes('text-sm text-blue-600 ml-2')
+    
+    def refresh_operation_config():
+        """刷新整个操作配置"""
+        nonlocal cfg, nodes_state
+        cfg = get_current_operation()
+        nodes_state[:] = _cfg_nodes_to_state()  # 更新状态列表
+        refresh_operation_info()
+        refresh_operation_select()
+        save_operation_manager()
+        _render_items()
+    
+    def refresh_operation_select():
+        """刷新操作选择下拉框"""
+        available_ops = list_available_operations()
+        operation_select.set_options(available_ops)
+        current_cfg = get_current_operation()
+        if current_cfg.name in available_ops:
+            operation_select.set_value(current_cfg.name)
+        elif available_ops:
+            # 如果当前流程不在可用列表中，选择第一个
+            operation_select.set_value(available_ops[0])
+            set_current_operation(available_ops[0])
+        else:
+            # 如果没有可用流程，设置为None
+            operation_select.set_value(None)
+    
+    def show_create_operation_dialog():
+        """显示创建新流程对话框"""
+        with ui.dialog() as dialog, ui.card():
+            with ui.card_section():
+                ui.label('创建新工作流程').classes('text-lg font-bold')
+                
+            with ui.card_section():
+                name_input = ui.input('流程名称', placeholder='请输入流程名称').props('dense outlined').classes('w-full')
+                desc_input = ui.textarea('流程描述', placeholder='请输入流程描述（可选）').props('dense outlined').classes('w-full')
+                
+            with ui.card_actions().classes('justify-end'):
+                ui.button('取消', on_click=dialog.close).props('flat')
+                ui.button('创建', color='primary', on_click=lambda: create_new_operation(name_input.value, desc_input.value, dialog)).props('unelevated')
+        
+        dialog.open()
+    
+    def create_new_operation(name: str, description: str, dialog):
+        """创建新的工作流程"""
+        if not name.strip():
+            logger.warning('流程名称不能为空')
+            return
+            
+        available_ops = list_available_operations()
+        if name in available_ops:
+            logger.warning(f'流程名称 "{name}" 已存在')
+            return
+        
+        try:
+            # 创建新的操作配置
+            new_config = OperationConfig(name=name, description=description.strip())
+            add_operation(name, new_config)
+            
+            # 设置为当前流程
+            set_current_operation(name)
+            
+            # 保存管理器状态
+            get_operation_manager()
+            save_operation_manager()
+            
+            # 刷新UI
+            refresh_operation_config()
+            
+            logger.info(f'成功创建工作流程: {name}')
+            dialog.close()
+            
+        except Exception as e:
+            logger.error(f'创建工作流程失败: {e}')
+    
+    def delete_current_operation():
+        """删除当前工作流程"""
+        cfg = get_current_operation()
+        if cfg.name == "无可用工作流程" or cfg.name == "无效工作流程":
+            logger.warning('无有效流程可删除')
+            return
+            
+        available_ops = list_available_operations()
+        if len(available_ops) <= 1:
+            logger.warning('至少需要保留一个工作流程')
+            return
+        
+        with ui.dialog() as dialog, ui.card():
+            with ui.card_section():
+                ui.label('确认删除').classes('text-lg font-bold text-red-600')
+                ui.label(f'确定要删除工作流程 "{cfg.name}" 吗？此操作不可撤销。')
+                
+            with ui.card_actions().classes('justify-end'):
+                ui.button('取消', on_click=dialog.close).props('flat')
+                ui.button('删除', color='negative', on_click=lambda: confirm_delete_operation(cfg.name, dialog)).props('unelevated')
+        
+        dialog.open()
+    
+    def confirm_delete_operation(name: str, dialog):
+        """确认删除工作流程"""
+        try:
+            if remove_operation(name):
+                save_operation_manager()
+                refresh_operation_config()
+                logger.info(f'已删除工作流程: {name}')
+            else:
+                logger.error(f'删除工作流程失败: {name}')
+            dialog.close()
+        except Exception as e:
+            logger.error(f'删除工作流程异常: {e}')
+            dialog.close()
+    
+    def show_copy_operation_dialog():
+        """显示复制流程对话框"""
+        cfg = get_current_operation()
+        if cfg.name == "无可用工作流程" or cfg.name == "无效工作流程":
+            logger.warning('无有效流程可复制')
+            return
+            
+        with ui.dialog() as dialog, ui.card():
+            with ui.card_section():
+                ui.label('复制工作流程').classes('text-lg font-bold')
+                ui.label(f'复制来源: {cfg.name}')
+                
+            with ui.card_section():
+                new_name_input = ui.input('新流程名称', placeholder='请输入新流程名称').props('dense outlined').classes('w-full')
+                new_desc_input = ui.textarea('流程描述', value=cfg.description, placeholder='请输入流程描述（可选）').props('dense outlined').classes('w-full')
+                
+            with ui.card_actions().classes('justify-end'):
+                ui.button('取消', on_click=dialog.close).props('flat')
+                ui.button('复制', color='primary', on_click=lambda: copy_current_operation(cfg, new_name_input.value, new_desc_input.value, dialog)).props('unelevated')
+        
+        dialog.open()
+    
+    def copy_current_operation(source_config: OperationConfig, new_name: str, new_description: str, dialog):
+        """复制当前工作流程"""
+        if not new_name.strip():
+            logger.warning('新流程名称不能为空')
+            return
+            
+        available_ops = list_available_operations()
+        if new_name in available_ops:
+            logger.warning(f'流程名称 "{new_name}" 已存在')
+            return
+        
+        try:
+            import copy
+            
+            # 深拷贝配置
+            new_config = copy.deepcopy(source_config)
+            new_config.name = new_name
+            new_config.description = new_description.strip()
+            
+            # 添加新流程
+            add_operation(new_name, new_config)
+            
+            # 设置为当前流程
+            set_current_operation(new_name)
+            
+            # 保存管理器状态
+            save_operation_manager()
+            
+            # 刷新UI
+            refresh_operation_config()
+            
+            logger.info(f'成功复制工作流程: {new_name}')
+            dialog.close()
+            
+        except Exception as e:
+            logger.error(f'复制工作流程失败: {e}')
+    
+    # 初次刷新流程信息
+    refresh_operation_info()
+    
+    ui.separator().classes('my-2')
+    ui.label('流程配置').classes('text-md font-bold text-blue-600')
     ui.label('条件节点返回 False 时跳到“同 id 的 target”（保存时自动生成）').classes('text-sm text-gray-600 mb-2')
 
     items_container = ui.column().classes('w-full gap-2')
@@ -240,7 +498,7 @@ def render_tasks_panel():
                                 sel = ui.select(
                                     task_choices,
                                     value=item['name'],
-                                    label='任务类',
+                                    label='任务',
                                     clearable=False,
                                     on_change=lambda e: on_step_change(e.value)
                                 ).props('dense outlined').classes('w-56 shrink-0')
@@ -289,7 +547,7 @@ def render_tasks_panel():
                                 sel = ui.select(
                                     cond_choices,
                                     value=item.get('name'),
-                                    label='条件类',
+                                    label='条件',
                                     clearable=False,
                                     on_change=lambda e: on_cond_change(e.value)
                                 ).props('dense outlined').classes('w-56 shrink-0')
@@ -383,9 +641,25 @@ def render_tasks_panel():
 
     def _add_condition_item():
         next_idx = len([x for x in nodes_state if x.get('type') == 'condition']) + 1
-        nodes_state.append({'type': 'condition', 'id': f'cond_{next_idx}', 'name': (next(iter(_COND_NODE_CLASSES.keys()), '') if _COND_NODE_CLASSES else ''), 'parameters': {}})
+        condition_id = f'cond_{next_idx}'
+        
+        # 添加条件节点
+        nodes_state.append({
+            'type': 'condition', 
+            'id': condition_id, 
+            'name': (next(iter(_COND_NODE_CLASSES.keys()), '') if _COND_NODE_CLASSES else ''), 
+            'parameters': {}
+        })
+        
+        # 立即添加对应的target节点
+        nodes_state.append({
+            'type': 'target', 
+            'id': condition_id, 
+            'name': 'TargetAnchor'
+        })
+        
         _render_items()
-
+        
     def _save_items():
         """从 UI 读回 -> 保存到 cfg.nodes；
         - 显式出现在 UI 的 target 节点按其位置保存
@@ -454,7 +728,8 @@ def render_tasks_panel():
 
         try:
             cfg.nodes = new_nodes
-            save_operation_config(cfg)
+            save_current_operation(cfg)
+            save_operation_manager()  # 确保管理器状态也被保存
             if missing:
                 logger.warning(f'配置已保存；为 {len(missing)} 个条件自动补充 target')
             else:
@@ -473,8 +748,21 @@ def render_tasks_panel():
     _render_items()
 
     # 运行/停止（新执行器）
+    # 用于跟踪流程状态变化
+    _previous_running_state = [False]  # 使用列表以便在嵌套函数中修改
+    
     def _update_button_states():
         running = is_task_process_running()
+        
+        # 检测状态变化 - 从运行变为停止
+        if _previous_running_state[0] and not running:
+            current_cfg = get_current_operation()
+            logger.info(f'流程 "{current_cfg.name}" 已结束')
+        
+        # 更新之前状态
+        _previous_running_state[0] = running
+        
+        # 更新UI状态
         for btn in step_cards.values():
             btn.props('loading' if running else 'loading=false')
         run_full_btn.props('loading' if running else 'loading=false')
@@ -484,12 +772,13 @@ def render_tasks_panel():
         if is_task_process_running():
             logger.warning('已有任务在运行中')
             return
-        nodes_count = len(getattr(cfg, 'nodes', []) or [])
+        current_cfg = get_current_operation()  # 获取最新的配置
+        nodes_count = len(getattr(current_cfg, 'nodes', []) or [])
         if nodes_count == 0:
             logger.warning('没有配置任何节点，请先添加并保存')
             return
         try:
-            logger.info(f'开始运行流程，共 {nodes_count} 个节点')
+            logger.info(f'开始运行流程 "{current_cfg.name}"，共 {nodes_count} 个节点')
             start_task_process_thread()
             logger.info(f'流程已启动（{nodes_count} 节点）')
             _update_button_states()

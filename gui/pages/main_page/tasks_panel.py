@@ -440,13 +440,19 @@ def render_flow_panel(ctx: UIPanelContext):
     # ---- 通用控制按钮 ----
     def _render_controls(idx: int):
         with ui.row().classes('items-center justify-end shrink-0 gap-1'):
-            ui.button(icon='arrow_upward', on_click=lambda e, i=idx: (_move_up(i), _render_items()))\
-                .props('dense flat size=sm').classes('text-xs')
-            ui.button(icon='arrow_downward', on_click=lambda e, i=idx: (_move_down(i), _render_items()))\
-                .props('dense flat size=sm').classes('text-xs')
-            ui.button(icon='delete', color='negative', on_click=lambda e, i=idx: (_delete(i), _render_items()))\
-                .props('dense flat size=sm').classes('text-xs')
-
+            ui.button(icon='format_list_numbered',  # 新增：移动到指定序号（固定前插）
+                    on_click=lambda e, i=idx: _open_move_dialog(i))\
+            .props('dense flat size=sm').classes('text-xs')
+            ui.button(icon='arrow_upward',
+                    on_click=lambda e, i=idx: (_move_up(i), _render_items()))\
+            .props('dense flat size=sm').classes('text-xs')
+            ui.button(icon='arrow_downward',
+                    on_click=lambda e, i=idx: (_move_down(i), _render_items()))\
+            .props('dense flat size=sm').classes('text-xs')
+            ui.button(icon='delete', color='negative',
+                    on_click=lambda e, i=idx: (_delete(i), _render_items()))\
+            .props('dense flat size=sm').classes('text-xs')
+            
     # ---- 回写当前 UI 值 ----
     def _save_current_values():
         for item in ctx.nodes_state:
@@ -680,6 +686,47 @@ def render_flow_panel(ctx: UIPanelContext):
     def _delete(i: int):
         _save_current_values()
         ctx.nodes_state.pop(i)
+        
+    def _move_to_position(src_i: int, dest_1based: int):
+        """把索引 src_i 的节点移动到“目标序号”之前（序号从 1 开始，固定前插）"""
+        _save_current_values()
+        n = len(ctx.nodes_state)
+        if n <= 1 or src_i < 0 or src_i >= n:
+            return
+
+        try:
+            dest_1 = int(dest_1based or 1)
+        except Exception:
+            dest_1 = 1
+        dest_1 = max(1, min(n, dest_1))   # 归一化到 1..n
+        dest0 = dest_1 - 1                # 转 0 基
+
+        item = ctx.nodes_state.pop(src_i)
+        if src_i < dest0:                 # 从上往下移时，弹出后目标位左移一格
+            dest0 -= 1
+        dest0 = max(0, min(len(ctx.nodes_state), dest0))
+        ctx.nodes_state.insert(dest0, item)
+        _render_items()
+
+
+    def _open_move_dialog(i: int):
+        """弹窗：输入目标序号，按固定规则插入到该序号之前"""
+        n = len(ctx.nodes_state)
+        with ui.dialog() as d, ui.card():
+            with ui.card_section():
+                ui.label(f'移动节点 #{i + 1}').classes('text-lg font-bold')
+            with ui.card_section():
+                target_no = ui.number(f'目标序号（1 - {n}）',
+                                    value=min(n, i + 1),
+                                    format='%.0f').props('dense outlined').classes('w-36')
+                ui.label('规则：插入到目标序号之前').classes('text-xs text-gray-500 mt-1')
+            with ui.card_actions().classes('justify-end'):
+                ui.button('取消', on_click=d.close).props('flat')
+                def _confirm():
+                    _move_to_position(i, target_no.value or 1)
+                    d.close()
+                ui.button('确定', color='primary', on_click=_confirm).props('unelevated')
+        d.open()
 
     # ---- 新增节点 ----
     def _add_task_item():

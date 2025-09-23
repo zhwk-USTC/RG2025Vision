@@ -5,11 +5,11 @@
 
 from typing import Optional, Tuple, Literal
 import time
-from vision import get_vision, CAM_KEY_TYPE
+from vision import CAM_KEY_TYPE
 from core.logger import logger
-from .communicate_utils import base_move, base_rotate, base_stop
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 from .vision_utils import VisionUtils
+from .base_movement_utils import MovementUtils, MoveDirection
 
 # ---------------------------
 # 控制策略参数（可按实际调参）
@@ -20,88 +20,13 @@ DEFAULT_TOLERANCE_XY = 0.005
 # 角度误差阈值（弧度）
 DEFAULT_TOLERANCE_YAW = 0.01
 
-# 允许旋转的位移门槛：动态计算，基于容差和角度误差
-ROT_GATE_TOLERANCE_MULTIPLIER = 10.0  # 基础门槛为容差的倍数
-ROT_GATE_ANGLE_SCALE = 0.5  # 角度误差对门槛的影响系数
-
-# 角度优先策略：当角度误差超过该阈值时，优先处理角度而非位置
-ANGLE_PRIORITY_THRESHOLD = 0.15  # rad (约8.6度)，超过此值时角度优先
-
-# 平移脉冲最小/最大时长（秒）
-MOVE_PULSE_MIN_SEC = 0.05
-MOVE_PULSE_MAX_SEC = 2.00
-# 旋转脉冲最小/最大时长（秒）
-ROT_PULSE_MIN_SEC  = 0.05
-ROT_PULSE_MAX_SEC  = 2.00
-
-# 速度参数（米/秒）
-SLOW_SPEED_MPS = 0.1    # 慢速移动速度
-FAST_SPEED_MPS = 0.3    # 快速移动速度
-# 旋转速度参数（弧度/秒，估算）
-SLOW_ROT_SPEED_RPS = 0.2    # 慢速旋转角速度  
-FAST_ROT_SPEED_RPS = 0.6    # 快速旋转角速度
-
-# 当误差超过该阈值时使用“fast”速度档，否则“slow”
-MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
-ROT_FAST_THR_RAD = 0.20     # 旋转快慢阈值（rad）
-
-# 运动指令执行等待时长（秒）——基线（最终会在代码里与动态脉冲叠加）
-MOVE_WAIT_BASE_SEC = 0.5
+# 允许旋转的位移门槛
+ROT_GATE_TOLERANCE_M = 0.10
 
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
     YAW_SIGN: int = -1
-
-    @staticmethod
-    def _calculate_rotation_gate(e_yaw: float, tolerance_x: float, tolerance_z: float) -> float:
-        """
-        动态计算旋转门槛，考虑摄像头偏心导致的旋转-平移耦合
-        
-        设计理念：
-        - 摄像头不在车辆中心时，旋转会产生额外的平移误差
-        - 门槛应该基于实际的位置容差，而不是固定值
-        - 角度误差越大，允许的位置误差门槛也相应放宽
-        
-        参数:
-            e_yaw: 当前角度误差（弧度）
-            tolerance_x: X轴位置容差（米）
-            tolerance_z: Z轴位置容差（米）
-            
-        返回:
-            动态计算的位置门槛值（米）
-            
-        计算公式:
-            base_gate = max(tolerance_x, tolerance_z) * multiplier
-            dynamic_gate = base_gate + |angle_error| * scale
-            确保门槛与实际容差成正比，同时考虑角度误差影响
-        """
-        import math
-        # 基础门槛：取两个容差的最大值，再乘以倍数
-        base_tolerance = max(tolerance_x, tolerance_z)
-        base_gate = base_tolerance * ROT_GATE_TOLERANCE_MULTIPLIER
-        
-        # 根据角度误差动态调整
-        angle_adjustment = abs(e_yaw) * ROT_GATE_ANGLE_SCALE
-        dynamic_gate = base_gate + angle_adjustment
-        
-        # 设置合理的上下限
-        min_gate = base_tolerance * 2  # 至少是容差的2倍
-        max_gate = base_tolerance * 30  # 最多是容差的30倍
-        
-        return max(min_gate, min(dynamic_gate, max_gate))
-
-    @staticmethod
-    def _sleep_and_stop(pulse_sec: float):
-        """
-        执行脉冲后等待，再停止。等待时长随脉冲动态放大，减少“没走完就测”的抖动。
-        """
-        # 主脉冲
-        time.sleep(max(0.0, pulse_sec))
-        base_stop()
-        # 叠加一点与脉冲相关的“完成等待”
-        settle = MOVE_WAIT_BASE_SEC
-        time.sleep(settle)
 
     @staticmethod
     def calculate_position_error(pose, target_z: float, target_x: float = 0.0, target_yaw: float = 0.0) -> Tuple[float, float, float]:
@@ -136,88 +61,68 @@ class AlignmentUtils:
     ) -> bool:
         # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
         return abs(e_x) < tolerance_z and abs(e_y) < tolerance_x and abs(e_yaw) < tolerance_yaw
+    
+    @staticmethod
+    def get_move_dir(e_x: float, e_y: float, cam_key: CAM_KEY_TYPE) -> MoveDirection:
+        """
+        根据误差和相机类型生成移动命令
+
+        参数:
+            e_x: X轴误差（前后，e_x > 0 表示需要向前移动）
+            e_y: Y轴误差（左右，e_y > 0 表示需要向左移动）
+            cam_key: 相机键名 ("front" 或 "left")
+            is_fast: 是否使用快速移动
+
+        返回:
+            移动命令，或 None（如果没有有效误差）
+        """
+        ax, ay = abs(e_x), abs(e_y)
+
+        # 选主轴（优先纠正更大的绝对误差）
+        use_x = (ax >= ay)
+
+        # 根据相机类型和误差方向选择移动命令
+        if cam_key == "front":
+            # 前方相机的移动逻辑
+            if use_x:
+                if e_x > 0:
+                    return 'forward'
+                else:
+                    return 'backward'
+            else:
+                if e_y > 0:
+                    return 'right'
+                else:
+                    return 'left'
+        else:
+            # left 相机的移动逻辑（默认）
+            if use_x:
+                if e_x > 0:
+                    return 'left'
+                else:
+                    return 'right'
+            else:
+                if e_y > 0:
+                    return 'forward'
+                else:
+                    return 'backward'
 
     @staticmethod
     def _move_discrete(e_x: float, e_y: float, cam_key: CAM_KEY_TYPE) -> None:
         """
         根据 e_x / e_y 误差发出一次“平移”离散指令（动态脉冲时长）。
-        —— 保持原有方向逻辑不变：
-        * 优先纠正更大的绝对误差
-        * e_x > 0 → left_slow；e_x < 0 → right_slow
-        * e_y > 0 → forward_slow；e_y < 0 → backward_slow
         """
-        ax, ay = abs(e_x), abs(e_y)
-
-        # 选主轴（保持原逻辑：ax >= ay 时走 e_x 分支，否则走 e_y 分支）
-        use_x = (ax >= ay)
-        mag = ax if use_x else ay
-
-        if mag <= 0.0:
-            base_stop()
-            return
-
-        # 根据误差大小选择快慢速度
-        is_fast = mag > MOVE_FAST_THR_M
-        speed = FAST_SPEED_MPS if is_fast else SLOW_SPEED_MPS
-        
-        # 脉冲时长 = 距离 / 速度
-        raw_pulse = float(mag) / speed
-        pulse_sec = max(MOVE_PULSE_MIN_SEC, min(MOVE_PULSE_MAX_SEC, raw_pulse))
-
-        # ---- 根据误差大小选择快慢速度档位 ----
-        if cam_key == "front":
-    # 前方相机的移动逻辑
-            if use_x:
-                if e_x > 0:
-                    base_move('forward_fast' if is_fast else 'forward_slow')
-                else:
-                    base_move('backward_fast' if is_fast else 'backward_slow')
-            else:
-                if e_y > 0:
-                    base_move('left_fast' if is_fast else 'left_slow')
-                else:
-                    base_move('right_fast' if is_fast else 'right_slow')
-        else:
-            # left 相机的移动逻辑（默认）
-            if use_x:
-                if e_x > 0:
-                    base_move('left_fast' if is_fast else 'left_slow')
-                else:
-                    base_move('right_fast' if is_fast else 'right_slow')
-            else:
-                if e_y > 0:
-                    base_move('forward_fast' if is_fast else 'forward_slow')
-                else:
-                    base_move('backward_fast' if is_fast else 'backward_slow')
-                
-        AlignmentUtils._sleep_and_stop(pulse_sec)
-
+        mag = max(abs(e_x), abs(e_y))
+        move_dir: MoveDirection = AlignmentUtils.get_move_dir(e_x, e_y, cam_key)
+        if move_dir:
+            MovementUtils.execute_move_by_distance(move_dir, mag)
 
     @staticmethod
-    def _rotate_discrete(e_yaw: float, tolerance_yaw: float = DEFAULT_TOLERANCE_YAW) -> None:
+    def _rotate_discrete(e_yaw: float) -> None:
         """
         角度误差超出容差即打一发“动态脉冲”。
         """
-        ayaw = abs(e_yaw)
-        if ayaw <= tolerance_yaw:
-            return
-
-        # 根据角度误差大小选择快慢速度
-        is_fast = False
-        rot_speed = FAST_ROT_SPEED_RPS if is_fast else SLOW_ROT_SPEED_RPS
-        
-        # 脉冲时长 = 角度 / 角速度
-        raw_pulse = float(ayaw) / rot_speed
-        pulse_sec = max(ROT_PULSE_MIN_SEC, min(ROT_PULSE_MAX_SEC, raw_pulse))
-
-        speed_suffix = '_fast' if is_fast else '_slow'
-        
-        if e_yaw > 0:
-            base_rotate('ccw_fast' if is_fast else 'ccw_slow')
-        else:
-            base_rotate('cw_fast' if is_fast else 'cw_slow')
-        
-        AlignmentUtils._sleep_and_stop(pulse_sec)
+        MovementUtils.execute_rotate_by_angle(e_yaw)
 
     @staticmethod
     def execute_alignment_move(
@@ -233,38 +138,32 @@ class AlignmentUtils:
         - 避免在错误朝向下进行位置调整，提高对齐效率
         """
         # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
-        x_aligned = abs(e_y) <= tolerance_x  # 左右对齐
-        z_aligned = abs(e_x) <= tolerance_z  # 前后对齐
-        yaw_aligned = abs(e_yaw) <= tolerance_yaw  # 角度对齐
-        
-        # 策略1: 角度误差很大时，优先处理角度（避免在错误朝向下调位置）
-        if abs(e_yaw) > ANGLE_PRIORITY_THRESHOLD:
-            # 使用放宽的门槛允许在较大位置误差下旋转
-            rotation_gate = AlignmentUtils._calculate_rotation_gate(e_yaw, tolerance_x, tolerance_z)
-            if abs(e_x) <= rotation_gate and abs(e_y) <= rotation_gate:
-                AlignmentUtils._rotate_discrete(e_yaw, tolerance_yaw)
-                return
-            # 如果位置误差太大连放宽门槛都不满足，先粗调位置
-            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
-            return
-        
-        # 策略2: 角度误差不大时，按传统方式先位置后角度
-        if not (x_aligned and z_aligned):
-            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
-            return
+        ax = abs(e_y)
+        az = abs(e_x)
+        ayaw = abs(e_yaw)
+        x_aligned = ax <= tolerance_x  # 左右对齐
+        z_aligned = az <= tolerance_z  # 前后对齐
+        yaw_aligned = ayaw <= tolerance_yaw  # 角度对齐
 
-        if not yaw_aligned:
-            # 位置已对齐，进行精细角度调整
-            rotation_gate = AlignmentUtils._calculate_rotation_gate(e_yaw, tolerance_x, tolerance_z)
-            if abs(e_x) <= rotation_gate and abs(e_y) <= rotation_gate:
-                AlignmentUtils._rotate_discrete(e_yaw, tolerance_yaw)
-                return
-            else:
-                # 位置虽然在容差内，但超过了旋转门槛，需要进一步缩小位置误差
+        rotation_gate_x = max(ROT_GATE_TOLERANCE_M, tolerance_x)
+        rotation_gate_z = max(ROT_GATE_TOLERANCE_M, tolerance_z)
+        
+        in_rot_gate = (ax <= rotation_gate_x) and (az <= rotation_gate_z)
+        # 没有在旋转门槛内，优先移动
+        if not in_rot_gate:
+            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
+            return
+        # 在旋转门槛内，优先旋转
+        elif not yaw_aligned:
+            AlignmentUtils._rotate_discrete(e_yaw)
+            return
+        # 位置和角度都在门槛内，优先位置微调
+        else:
+            if not (x_aligned and z_aligned):
                 AlignmentUtils._move_discrete(e_x, e_y, cam_key)
                 return
 
-        base_stop()
+        MovementUtils.stop_movement()
 
     @staticmethod
     def apriltag_alignment_loop(
@@ -299,7 +198,7 @@ class AlignmentUtils:
                 task_name
             )
             if pose is None:
-                base_stop()
+                MovementUtils.stop_movement()
                 return False
 
             e_x, e_y, e_yaw = AlignmentUtils.calculate_position_error(
@@ -331,7 +230,7 @@ class AlignmentUtils:
                 tolerance_z=tolerance_z,
                 tolerance_yaw=tolerance_yaw
             ):
-                base_stop()
+                MovementUtils.stop_movement()
                 logger.info(f"[{task_name}] 已对齐到目标位置")
                 set_debug_var(f'{debug_prefix}_status', 'done',
                               DebugLevel.SUCCESS, DebugCategory.STATUS, f"已成功对齐到{task_name}")

@@ -1,6 +1,7 @@
 import time
 from core.logger import logger
-from ....utils.communicate_utils import base_move, base_stop, base_rotate
+from ....utils.communicate_utils import base_set_move, base_stop, base_set_rotate
+from ....utils.base_movement_utils import MovementUtils
 from ....debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 class BaseMove:
@@ -34,11 +35,9 @@ class BaseMove:
             set_debug_var('base_move_duration', self.duration, 
                          DebugLevel.INFO, DebugCategory.CONTROL, "底盘移动持续时间")
             
-            # 执行移动
+            # 执行移动（使用平滑移动）
             move_command = f"{self.direction}_{self.speed}"
-            base_move(move_command) # type: ignore
-            time.sleep(self.duration)
-            base_stop()
+            MovementUtils.execute_smooth_move(move_command, self.duration)  # type: ignore
             
             logger.info("[BaseMove] 移动完成")
             set_debug_var('base_move_status', 'success', 

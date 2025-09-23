@@ -71,7 +71,7 @@ def wait_for_value(var: Var, timeout: float = 5.0):
 
 # --- 底盘相关 ---
 
-def base_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'backward_slow', 'left_fast', 'left_slow', 'right_fast', 'right_slow']):
+def base_set_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'backward_slow', 'left_fast', 'left_slow', 'right_fast', 'right_slow']):
     match dir:
         case 'forward_fast':
             send_kv({Var.BASE_MOVE_FORWARD_FAST: True})
@@ -90,7 +90,7 @@ def base_move(dir: Literal['forward_fast', 'forward_slow', 'backward_fast', 'bac
         case 'right_slow':
             send_kv({Var.BASE_MOVE_RIGHT_SLOW: True})
             
-def base_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
+def base_set_rotate(dir: Literal['cw_fast', 'cw_slow', 'ccw_fast', 'ccw_slow']):
     match dir:
         case 'cw_fast':
             send_kv({Var.BASE_ROTATE_CW_FAST: True})

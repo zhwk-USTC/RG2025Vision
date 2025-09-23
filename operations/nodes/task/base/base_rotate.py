@@ -1,6 +1,7 @@
 import time
 from core.logger import logger
-from ....utils.communicate_utils import base_rotate, base_stop
+from ....utils.communicate_utils import base_set_rotate, base_stop
+from ....utils.base_movement_utils import MovementUtils
 from ....debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 class BaseRotate:
@@ -34,11 +35,9 @@ class BaseRotate:
             set_debug_var('base_rotate_duration', self.duration, 
                          DebugLevel.INFO, DebugCategory.CONTROL, "底盘旋转持续时间")
             
-            # 执行旋转
+            # 执行旋转（使用平滑旋转）
             rotate_command = f"{self.direction}_{self.speed}"
-            base_rotate(rotate_command) # type: ignore
-            time.sleep(self.duration)
-            base_stop()
+            MovementUtils.execute_smooth_rotate(rotate_command, self.duration)  # type: ignore
             
             logger.info("[BaseRotate] 旋转完成")
             set_debug_var('base_rotate_status', 'success', 

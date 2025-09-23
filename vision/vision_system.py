@@ -101,7 +101,7 @@ class VisionSystem:
     def get_latest_frame(self, key: CAM_KEY_TYPE) -> Optional[np.ndarray]:
         return self._latest_frames.get(key)
 
-    def detect_tag36h11(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]) -> Optional[List[TagDetection]]:
+    def detect_tag36h11(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]=None) -> Optional[List[TagDetection]]:
         if frame is None:
             logger.error(f"[VisionSystem] detect_tag36h11 输入帧为空")
             return None
@@ -110,8 +110,8 @@ class VisionSystem:
         result = detector.detect(
             image=frame, intrinsics=intrinsics, tag_size=tag_size)
         return result
-    
-    def detect_tag25h9(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]) -> Optional[List[TagDetection]]:
+
+    def detect_tag25h9(self, frame: Optional[np.ndarray], intrinsics: Optional[CameraIntrinsics], tag_size: Optional[float]=None) -> Optional[List[TagDetection]]:
         if frame is None:
             logger.error(f"[VisionSystem] detect_tag25h9 输入帧为空")
             return None

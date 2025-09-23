@@ -29,8 +29,6 @@ from operations.config.operation_config import (
     save_operation_manager,
 )
 
-from gui.utils.tab_memory import create_memorable_tabs
-
 # ===============================
 # 共享上下文
 # ===============================
@@ -201,26 +199,24 @@ def render_single_step_panel(ctx: UIPanelContext):
             if n in ctx.step_cards:
                 ctx.step_cards[n].props('loading')
 
-        with ui.card().classes('w-full mb-2 hover:shadow transition-all'):
-            with ui.card_section().classes('p-3'):
-                with ui.row().classes('items-center w-full gap-3 no-wrap'):
-                    ui.label(step_name).classes('font-bold text-base text-blue-700 shrink-0 min-w-40 max-w-64 truncate')
-                    ctx.step_param_widgets[step_name] = {}
-                    _param_items = [(pn, pa) for pn, pa in sig.parameters.items() if pn != 'self']
-                    if _param_items:
-                        with ui.column().classes('gap-2 flex-1'):
-                            for pname, param in _param_items:
-                                w = _create_param_input(pname, param, preset.get(pname))
-                                ctx.step_param_widgets[step_name][pname] = w
-                    btn = ui.button('运行', color='primary', icon='play_arrow').classes('text-sm px-3')
-                    ctx.step_cards[step_name] = btn
-                    btn.on('click', _on_click_run)
+        with ui.expansion(step_name, value=False).classes('w-full mb-1').props('header-class="font-bold text-base text-blue-700"'):
+            with ui.row().classes('items-start gap-3 w-full'):
+                ctx.step_param_widgets[step_name] = {}
+                _param_items = [(pn, pa) for pn, pa in sig.parameters.items() if pn != 'self']
+                if _param_items:
+                    with ui.column().classes('gap-2 flex-1'):
+                        for pname, param in _param_items:
+                            w = _create_param_input(pname, param, preset.get(pname))
+                            ctx.step_param_widgets[step_name][pname] = w
+                btn = ui.button('运行', color='primary', icon='play_arrow').classes('text-sm px-3')
+                ctx.step_cards[step_name] = btn
+                btn.on('click', _on_click_run)
 
-    with ui.expansion('单步骤调试', icon='list_alt', value=False).classes('w-full mt-2'):
-        ui.label('每个步骤可自定义参数；修改后点击“运行”').classes('text-sm text-gray-600 mb-2')
-        with ui.grid(columns=1).classes('w-full gap-2 items-stretch'):
-            for _step_name in _TASK_NODE_CLASSES.keys():
-                _render_single_task_card(_step_name)
+    # with ui.expansion('单步骤调试', icon='list_alt', value=False).classes('w-full mt-2'):
+    ui.label('每个步骤可自定义参数；修改后点击“运行”').classes('text-sm text-gray-600 mb-2')
+    with ui.grid(columns=1).classes('w-full gap-2 items-stretch'):
+        for _step_name in _TASK_NODE_CLASSES.keys():
+            _render_single_task_card(_step_name)
 
 
 # ===============================
@@ -546,23 +542,25 @@ def render_flow_panel(ctx: UIPanelContext):
                         on_change=lambda e, i=idx: _on_task_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
 
+                    # 控制按钮
+                    _render_controls(idx)
+
+                # 展开项
+                with ui.expansion('参数', value=False).classes('w-full mt-2'):
                     # 参数区
                     param_widgets = {}
                     name = item.get('name')
                     if name in _TASK_NODE_CLASSES:
                         params = _ctor_params(_TASK_NODE_CLASSES[name])
                         if params:
-                            with ui.column().classes('gap-2 flex-1 mt-2'):
+                            with ui.column().classes('gap-2 flex-1'):
                                 for pname, p in params:
                                     cur = (item.get('parameters') or {}).get(pname)
                                     param_widgets[pname] = _create_param_input(pname, p, preset=cur)
 
-                    # 控制按钮
-                    _render_controls(idx)
-
-                    # 回写引用
-                    item['__param_widgets'] = param_widgets
-                    item['__sel'] = sel
+                # 回写引用
+                item['__param_widgets'] = param_widgets
+                item['__sel'] = sel
 
     def _render_cond_card(idx: int, item: dict):
         kind = 'cond'
@@ -582,34 +580,33 @@ def render_flow_panel(ctx: UIPanelContext):
                         on_change=lambda e, i=idx: _on_cond_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
                     
+                    # 控制按钮
+                    _render_controls(idx)
+                    
+                # ID 输入 + 链接提示
+                with ui.row().classes('items-center gap-2'):
+                    link_icon = ui.icon('link').classes('text-amber-500')
+                    ui.tooltip('条件为 False 时跳转到相同 ID 的 Target')
+                    id_in = ui.input('节点 ID（与 target 同 id）', value=item.get('id', '')
+                                    ).props('dense outlined size=sm').classes('w-56')
+
+                # 展开项
+                with ui.expansion('参数', value=False).classes('w-full mt-2'):
                     # 参数区
                     param_widgets = {}
                     name = item.get('name')
                     if name in _COND_NODE_CLASSES:
                         params = _ctor_params(_COND_NODE_CLASSES[name])
                         if params:
-                            with ui.column().classes('gap-2 flex-1 mt-2'):
+                            with ui.column().classes('gap-2 flex-1'):
                                 for pname, p in params:
                                     cur = (item.get('parameters') or {}).get(pname)
                                     param_widgets[pname] = _create_param_input(pname, p, preset=cur)
 
-
-                    # ID 输入 + 链接提示
-                    with ui.row().classes('items-center gap-2'):
-                        link_icon = ui.icon('link').classes('text-amber-500')
-                        ui.tooltip('条件为 False 时跳转到相同 ID 的 Target')
-                        id_in = ui.input('节点 ID（与 target 同 id）', value=item.get('id', '')
-                                        ).props('dense outlined size=sm').classes('w-56')
-
-
-
-                    # 控制按钮
-                    _render_controls(idx)
-
-                    # 回写引用
-                    item['__id_input'] = id_in
-                    item['__param_widgets'] = param_widgets
-                    item['__sel'] = sel
+                # 回写引用
+                item['__id_input'] = id_in
+                item['__param_widgets'] = param_widgets
+                item['__sel'] = sel
 
     def _render_target_card(idx: int, item: dict):
         kind = 'target'
@@ -651,23 +648,14 @@ def render_flow_panel(ctx: UIPanelContext):
                     ui.badge(str(idx + 1)).classes('shrink-0 text-base font-bold')
                     _title_label('Note', kind)
 
-                    # # 标题（占用 name 字段，可选）
-                    # name_in = ui.input('标题（可选）', value=title)\
-                    #             .props('dense outlined size=sm').classes('w-56')
-
-                    # # 只读显示 ID（可不渲染，如不需要）
-                    # if note_id:
-                    #     ui.label(f'ID: {note_id}').classes('text-xs text-gray-500')
-
-                    # 正文内容
+                    # 注释内容
                     text_in = ui.textarea('注释内容', value=text_val)\
-                                .props('dense outlined autogrow').classes('w-full min-h-[80px] mt-2')
+                                .props('dense outlined autogrow').classes('w-56 min-h-[40px]')
 
-                    # 控制按钮（上/下/删）
+                    # 控制按钮
                     _render_controls(idx)
 
                 # 回写引用，供保存/状态回写使用
-                # item['__name_input'] = name_in
                 item['__text_input'] = text_in
 
 
@@ -941,27 +929,5 @@ def render_flow_panel(ctx: UIPanelContext):
     ui.timer(1.0, _update_button_states)
 
 
-# ===============================
-# 主入口：组合 Tabs
-# ===============================
-def render_tasks_panel():
-    ui.markdown('## 控制面板')
-
-    cfg = get_current_operation()
-    nodes_state = _cfg_nodes_to_state(cfg)
-    ctx = UIPanelContext(nodes_state=nodes_state)
-    
-    def _render_debug():
-        render_single_step_panel(ctx)
-
-    def _render_flow():
-        render_flow_panel(ctx)
-
-    tab_configs = {
-        'debug': ('单步调试', _render_debug),
-        'flow':  ('流程', _render_flow),
-    }
-
-    create_memorable_tabs(memory_key='tasks_panel_tabs', tab_configs=tab_configs, default_tab='debug')
 
 

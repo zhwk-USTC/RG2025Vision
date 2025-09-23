@@ -8,6 +8,7 @@ from .common.system_cleanup import SystemCleanup
 from .common.system_init import SystemInit
 from .turret_align_to_light import TurretAlignToLight
 from .reset_counter import ResetCounter
+from .common.set_camera_exposure import SetCameraExposure
 
 # 汇总所有任务节点类
 _TASK_NODE_CLASSES = {
@@ -28,4 +29,5 @@ _TASK_NODE_CLASSES = {
     'system_init': SystemInit,
     'turret_align_to_light': TurretAlignToLight,
     'reset_counter': ResetCounter,
+    'set_camera_exposure': SetCameraExposure,
 }

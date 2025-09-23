@@ -26,7 +26,7 @@ class OperationNodeConfig:
       - 'note'：仅显示文字的注释节点（新增）
         - 建议将正文存放在 parameters['text'] 中
     """
-    type: Literal["task", "condition", "target", "note"]  # ← 新增 "note"
+    type: Literal["task", "condition", "target", "note", "subflow"]
     id: str = ""    # 节点唯一标识（note 可留空或按需生成）
     name: str = ""  # 节点名称（note 可做标题/留空）
     parameters: Dict[str, Any] = field(default_factory=dict)  # 节点参数（note: 放置 'text' 等）

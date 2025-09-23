@@ -127,6 +127,17 @@ class TaskExecutor:
                     self._execute_note_node(node_id, class_name, params)
                     i += 1
                     
+                elif node_type == 'subflow':
+                    ok = self._execute_subflow_node(node_id, params)
+                    self.execution_context[node_id] = ok
+                    self.execution_context['last_result'] = ok
+                    if not ok:
+                        has_failed_tasks = True
+                        set_debug_var('subflow_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
+                                      f"子流程节点 {node_id} 执行失败，继续下一个任务")
+                        logger.warning(f"子流程节点 {node_id} 执行失败，继续执行下一个任务")
+                    i += 1
+                    
                 elif node_type == 'target':
                     i += 1
 
@@ -283,6 +294,172 @@ class TaskExecutor:
             DebugCategory.STATUS,
             f"注释节点 {node_id}"
         )
+
+    # ---------- 子步骤：子流程（subflow）节点 ----------
+    def _execute_subflow_node(self, node_id: str, parameters: Dict[str, Any]) -> bool:
+        """执行子流程节点：加载并执行指定的子流程"""
+        subflow_name = parameters.get('subflow_name')
+        if not subflow_name or not isinstance(subflow_name, str):
+            set_debug_var('error', f'Missing subflow name for subflow {node_id}',
+                          DebugLevel.ERROR, DebugCategory.ERROR, f"子流程 {node_id} 缺少子流程名称")
+            return False
+
+        from operations.config.operation_config import load_operation_config
+        subflow_config = load_operation_config(subflow_name)
+        if not subflow_config or not getattr(subflow_config, 'nodes', None):
+            set_debug_var('error', f'Invalid subflow config: {subflow_name}',
+                          DebugLevel.ERROR, DebugCategory.ERROR, f"无效的子流程配置: {subflow_name}")
+            return False
+
+        set_debug_var('subflow_start', subflow_name, DebugLevel.INFO, DebugCategory.STATUS,
+                      f"开始执行子流程 {subflow_name}")
+
+        # 初始化递归栈（如果不存在）
+        if not hasattr(self, '_recursion_stack'):
+            self._recursion_stack = []
+
+        # 推入递归栈
+        self._recursion_stack.append(subflow_name)
+
+        try:
+            # 创建临时执行器来执行子流程
+            sub_executor = TaskExecutor()
+            sub_executor.flow = list(subflow_config.nodes)
+            sub_executor.execution_context = dict(self.execution_context)  # 继承上下文
+            # 传递递归栈给子执行器
+            sub_executor._recursion_stack = list(self._recursion_stack)
+
+            # 执行子流程（不运行 system_init/cleanup，因为已经在主流程中运行）
+            result = sub_executor._execute_flow_without_init_cleanup()
+            set_debug_var('subflow_result', result, DebugLevel.INFO, DebugCategory.STATUS,
+                          f"子流程 {subflow_name} 执行结果: {result}")
+            return result
+        except Exception as e:
+            set_debug_var('subflow_error', f'Subflow {subflow_name} exception: {e}',
+                          DebugLevel.ERROR, DebugCategory.ERROR, f"子流程 {subflow_name} 执行异常: {e}")
+            return False
+        finally:
+            # 弹出递归栈
+            if self._recursion_stack and self._recursion_stack[-1] == subflow_name:
+                self._recursion_stack.pop()
+
+    def _execute_flow_without_init_cleanup(self) -> bool:
+        """执行流程但不运行 system_init 和 system_cleanup（用于子流程）"""
+        global _stop_requested
+
+        # 每次执行前重置执行上下文，确保状态不会跨执行保留
+        self.execution_context.clear()
+
+        try:
+            if not self.flow:
+                logger.error("没有可执行的流程配置")
+                return False
+
+            reset_debug_vars()
+            set_debug_var('subflow_process_status', 'starting', DebugLevel.INFO, DebugCategory.STATUS, "子流程开始")
+            set_debug_var('subflow_config', [getattr(n, 'id', '?') for n in self.flow],
+                          DebugLevel.INFO, DebugCategory.STATUS, f"子流程配置: {len(self.flow)} 个节点")
+
+            # 仅为 target 节点建表：id -> index
+            target_map: Dict[str, int] = {
+                n.id: idx
+                for idx, n in enumerate(self.flow)
+                if getattr(n, "id", None) and getattr(n, "type", None) == "target"
+            }
+
+            has_failed_tasks = False  # 跟踪是否有任务失败
+
+            i = 0
+            while i < len(self.flow):
+                if is_stop_requested():
+                    raise TaskStoppedException(f"Task stopped before node {self.flow[i].id}")
+
+                node = self.flow[i]
+                node_id: str = getattr(node, 'id', f'#{i}')
+                node_type: str = getattr(node, 'type', 'unknown')
+                class_name: str = getattr(node, 'name', '')  # OperationNode 的 name 字段即类名
+                params: Dict[str, Any] = getattr(node, 'parameters', {}) or {}
+
+                set_debug_var('current_subflow_node', node_id, DebugLevel.INFO, DebugCategory.STATUS,
+                              f"当前子流程节点：ID {node_id}, 类型 {node_type}, 类名 {class_name}")
+
+                if node_type == 'task':
+                    ok = self._execute_task_node(node_id, class_name, params)
+                    self.execution_context[node_id] = ok
+                    self.execution_context['last_result'] = ok
+                    if not ok:
+                        has_failed_tasks = True
+                        set_debug_var('subflow_task_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
+                                      f"子流程任务节点 {node_id} 执行失败，继续下一个任务")
+                        logger.warning(f"子流程任务节点 {node_id} 执行失败，继续执行下一个任务")
+                    i += 1
+
+                elif node_type == 'condition':
+                    next_idx = self._execute_condition_node(node_id, class_name, params, target_map)
+                    i = next_idx if next_idx is not None else (i + 1)
+
+                elif node_type == 'note':
+                    self._execute_note_node(node_id, class_name, params)
+                    i += 1
+                    
+                elif node_type == 'subflow':
+                    # 子流程中支持嵌套子流程，但需要防止无限递归
+                    subflow_name_in_sub = params.get('subflow_name')
+                    if not subflow_name_in_sub or not isinstance(subflow_name_in_sub, str):
+                        logger.warning(f"嵌套子流程节点 {node_id} 缺少有效的子流程名称")
+                        i += 1
+                    elif self._would_cause_recursion(subflow_name_in_sub):
+                        logger.warning(f"检测到递归子流程调用，已跳过: {node_id} -> {subflow_name_in_sub}")
+                        set_debug_var('recursion_detected', f'{node_id} -> {subflow_name_in_sub}',
+                                      DebugLevel.WARNING, DebugCategory.ERROR,
+                                      f"递归子流程调用被阻止")
+                        i += 1
+                    else:
+                        ok = self._execute_subflow_node(node_id, params)
+                        self.execution_context[node_id] = ok
+                        self.execution_context['last_result'] = ok
+                        if not ok:
+                            has_failed_tasks = True
+                            set_debug_var('nested_subflow_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
+                                          f"嵌套子流程节点 {node_id} 执行失败，继续下一个任务")
+                            logger.warning(f"嵌套子流程节点 {node_id} 执行失败，继续执行下一个任务")
+                        i += 1
+                    
+                elif node_type == 'target':
+                    i += 1
+
+                else:
+                    logger.warning(f"未知节点类型: {node_type}")
+                    i += 1
+
+            if has_failed_tasks:
+                set_debug_var('subflow_process_status', 'completed_with_failures',
+                              DebugLevel.WARNING, DebugCategory.STATUS,
+                              f"子流程完成但有失败任务：共处理 {len(self.flow)} 个节点")
+                logger.warning("子流程完成，但存在失败的任务")
+                return False
+            else:
+                set_debug_var('subflow_process_status', 'completed_normally',
+                              DebugLevel.SUCCESS, DebugCategory.STATUS,
+                              f"子流程正常完成：共处理 {len(self.flow)} 个节点")
+                return True
+
+        except TaskStoppedException as e:
+            set_debug_var('subflow_process_status', f'stopped: {e}', DebugLevel.WARNING, DebugCategory.STATUS,
+                          f"子流程被用户停止: {e}")
+            return False
+
+        except Exception as e:
+            set_debug_var('subflow_process_status', f'error: {e}', DebugLevel.ERROR, DebugCategory.ERROR,
+                          f"子流程执行异常: {e}")
+            return False
+
+    def _would_cause_recursion(self, subflow_name: str) -> bool:
+        """检测是否会导致递归调用（通过检查调用栈）"""
+        # 检查当前执行器是否已经在执行这个子流程
+        # 通过检查 execution_context 中的特殊标记
+        recursion_stack = getattr(self, '_recursion_stack', [])
+        return subflow_name in recursion_stack
 
 
 # ---- 全局执行器实例 ----

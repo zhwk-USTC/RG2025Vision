@@ -93,17 +93,21 @@ def _create_param_input(param_name: str, param: inspect.Parameter, preset=None) 
 
 
 def _cfg_nodes_to_state(cfg):
-    """配置 -> UI 状态（task/condition/target/note）"""
+    """配置 -> UI 状态（task/condition/target/note/subflow）"""
     items = getattr(cfg, 'nodes', []) or []
     out = []
     for n in items:
         n_type = getattr(n, 'type', None)
         base = {'type': n_type, 'id': getattr(n, 'id', ''), 'name': getattr(n, 'name', '')}
         # 这里把 note 加进“有 parameters 的类型”
-        if n_type in ('task', 'condition', 'note'):
+        if n_type in ('task', 'condition', 'note', 'subflow'):
             base['parameters'] = dict(getattr(n, 'parameters', {}) or {})
         # 这里把 note 加进可加入的类型列表
-        if n_type in ('task', 'condition', 'target', 'note'):
+        if n_type in ('task', 'condition', 'target', 'note', 'subflow'):
+            # 对于 subflow 节点，从 parameters 中提取 subflow_name 作为 name
+            if n_type == 'subflow':
+                subflow_name = (getattr(n, 'parameters', {}) or {}).get('subflow_name', '')
+                base['name'] = subflow_name
             out.append(base)
     return out
 
@@ -295,6 +299,7 @@ def render_flow_panel(ctx: UIPanelContext):
         'cond':    {'border': 'border-amber-500',   'icon': 'rule',         'icon_cls': 'text-amber-600',   'title_cls': 'text-amber-700'},
         'target':  {'border': 'border-emerald-500', 'icon': 'flag',         'icon_cls': 'text-emerald-600', 'title_cls': 'text-emerald-700'},
         'note': {'border': 'border-violet-500', 'icon': 'sticky_note_2', 'icon_cls': 'text-violet-600', 'title_cls': 'text-violet-700'},
+        'subflow': {'border': 'border-orange-500', 'icon': 'call_split',   'icon_cls': 'text-orange-600', 'title_cls': 'text-orange-700'},
     }
 
     def _card_classes(kind: str) -> str:
@@ -510,6 +515,7 @@ def render_flow_panel(ctx: UIPanelContext):
     TYPE_COND = 'condition'
     TYPE_TARGET = 'target'
     TYPE_NOTE = 'note'
+    TYPE_SUBFLOW = 'subflow'
 
     task_choices = list(_TASK_NODE_CLASSES.keys())
     cond_choices = list(_COND_NODE_CLASSES.keys())
@@ -583,6 +589,15 @@ def render_flow_panel(ctx: UIPanelContext):
             return
         _save_current_values()
         if new_value in cond_choices:
+            ctx.nodes_state[i]['name'] = new_value
+            ctx.nodes_state[i]['parameters'] = {}
+        _render_items()
+
+    def _on_subflow_change(new_value: str, i: int):
+        if i >= len(ctx.nodes_state):
+            return
+        _save_current_values()
+        if new_value in list_available_operations():
             ctx.nodes_state[i]['name'] = new_value
             ctx.nodes_state[i]['parameters'] = {}
         _render_items()
@@ -728,6 +743,31 @@ def render_flow_panel(ctx: UIPanelContext):
                 # 回写引用，供保存/状态回写使用
                 item['__text_input'] = text_in
 
+    def _render_subflow_card(idx: int, item: dict):
+        kind = 'subflow'
+        with ui.card().classes(_card_classes(kind)):
+            with ui.card_section().classes('p-3'):
+                with ui.row().classes('items-center w-full gap-3 no-wrap'):
+                    ui.icon(STYLE[kind]['icon']).classes(STYLE[kind]['icon_cls'])
+                    ui.badge(str(idx + 1)).classes('shrink-0 text-base font-bold')
+                    _title_label('Subflow', kind)
+
+                    # 流程选择
+                    flow_choices = list_available_operations()
+                    sel = ui.select(
+                        flow_choices,
+                        value=item.get('name'),
+                        label='子流程',
+                        clearable=False,
+                        on_change=lambda e, i=idx: _on_subflow_change(e.value, i),
+                    ).props('dense outlined').classes('w-56 shrink-0')
+
+                    # 控制按钮
+                    _render_controls(idx)
+
+                # 回写引用
+                item['__sel'] = sel
+
 
 
     # ---- 列表渲染入口 ----
@@ -744,6 +784,8 @@ def render_flow_panel(ctx: UIPanelContext):
                     _render_target_card(idx, item)
                 elif t == TYPE_NOTE:
                     _render_note_card(idx, item)
+                elif t == TYPE_SUBFLOW:
+                    _render_subflow_card(idx, item)
                 else:
                     with ui.card().classes('w-full mb-2'):
                         with ui.card_section().classes('p-3'):
@@ -832,9 +874,21 @@ def render_flow_panel(ctx: UIPanelContext):
         _save_current_values()
         ctx.nodes_state.append({
             'type': TYPE_NOTE,
-            'id': '',           # 可留空，保存时自动生成 note_{idx}
+            'id': '',           # 可留空，保存时自动生成
             'name': '注释',      # 默认标题
             'parameters': {'text': ''},
+        })
+        _render_items()
+
+    def _add_subflow_item():
+        _save_current_values()
+        available_ops = list_available_operations()
+        default_flow = available_ops[0] if available_ops else ''
+        ctx.nodes_state.append({
+            'type': TYPE_SUBFLOW,
+            'id': '',
+            'name': default_flow,
+            'parameters': {},
         })
         _render_items()
 
@@ -892,6 +946,11 @@ def render_flow_panel(ctx: UIPanelContext):
                             params[pname] = v
                 new_nodes.append(OperationNodeConfig(type=TYPE_COND, id=node_id, name=name, parameters=params)) # type: ignore
 
+            elif t == TYPE_SUBFLOW:
+                name = getattr(item.get('__sel'), 'value', item.get('name')) if item.get('__sel') else item.get('name')
+                params = {'subflow_name': name}
+                new_nodes.append(OperationNodeConfig(type=TYPE_SUBFLOW, id=f'subflow_{idx}', name='', parameters=params)) # type: ignore
+
             elif t == TYPE_TARGET:
                 # 注意：无论 target 在 condition 上/下方，都以“预扫集合”判断合法性，并按当前位置保存
                 t_id = getattr(item.get('__id_input_target'), 'value', item.get('id', '')) if item.get('__id_input_target') else item.get('id', '')
@@ -937,6 +996,7 @@ def render_flow_panel(ctx: UIPanelContext):
         ui.button('新增任务节点', icon='add', on_click=_add_task_item).props('dense')
         ui.button('新增条件节点', icon='add_alert', on_click=_add_condition_item).props('dense')
         ui.button('新增注释节点', icon='sticky_note_2', on_click=_add_note_item).props('dense')
+        ui.button('新增子流程节点', icon='call_split', on_click=_add_subflow_item).props('dense')
         ui.button('保存配置', color='primary', icon='save', on_click=_save_items).props('dense')
 
     # 初次渲染

@@ -354,19 +354,20 @@ def render_flow_panel(ctx: UIPanelContext):
             else:
                 operation_select.set_value(None)
 
-        current_info_container = ui.row().classes('mb-3 p-2 bg-blue-50 rounded')
+        # current_info_container = ui.row().classes('mb-3 p-2 bg-blue-50 rounded')
 
         def refresh_operation_info():
             """刷新流程信息显示"""
-            current_info_container.clear()
-            with current_info_container:
-                cur = get_current_operation()
-                ui.icon('info').classes('text-blue-600')
-                ui.label(f'当前流程: {cur.name}').classes('font-medium text-blue-800')
-                if cur.description:
-                    ui.label(f'描述: {cur.description}').classes('text-sm text-blue-600 ml-2')
-                nodes_count = len(getattr(cur, 'nodes', []) or [])
-                ui.label(f'节点数: {nodes_count}').classes('text-sm text-blue-600 ml-2')
+            pass
+            # current_info_container.clear()
+            # with current_info_container:
+            #     cur = get_current_operation()
+            #     ui.icon('info').classes('text-blue-600')
+            #     ui.label(f'当前流程: {cur.name}').classes('font-medium text-blue-800')
+            #     if cur.description:
+            #         ui.label(f'描述: {cur.description}').classes('text-sm text-blue-600 ml-2')
+            #     nodes_count = len(getattr(cur, 'nodes', []) or [])
+            #     ui.label(f'节点数: {nodes_count}').classes('text-sm text-blue-600 ml-2')
 
         def refresh_operation_config():
             """刷新整个操作配置（并重渲流程配置区）"""
@@ -497,7 +498,49 @@ def render_flow_panel(ctx: UIPanelContext):
             except Exception as e:
                 logger.error(f'复制工作流程失败: {e}')
 
+        def show_rename_operation_dialog():
+            cur = get_current_operation()
+            if cur.name in ("无可用工作流程", "无效工作流程"):
+                logger.warning('无有效流程可重命名')
+                return
+            with ui.dialog() as dialog, ui.card():
+                with ui.card_section():
+                    ui.label('重命名工作流程').classes('text-lg font-bold')
+                    ui.label(f'当前名称: {cur.name}')
+                with ui.card_section():
+                    new_name_input = ui.input('新流程名称', placeholder='请输入新流程名称').props('dense outlined').classes('w-full')
+                with ui.card_actions().classes('justify-end'):
+                    ui.button('取消', on_click=dialog.close).props('flat')
+                    ui.button('重命名', color='primary',
+                              on_click=lambda: rename_current_operation(cur.name, new_name_input.value, dialog)
+                              ).props('unelevated')
+            dialog.open()
+
+        def rename_current_operation(old_name: str, new_name: str, dialog):
+            if not new_name or not new_name.strip():
+                logger.warning('新流程名称不能为空')
+                return
+            if new_name == old_name:
+                logger.warning('新名称与原名称相同')
+                return
+            if new_name in list_available_operations():
+                logger.warning(f'流程名称 "{new_name}" 已存在')
+                return
+            try:
+                from operations.config.operation_config import rename_operation
+                if rename_operation(old_name, new_name):
+                    _save_operation_mgr()
+                    refresh_operation_config()
+                    logger.info(f'成功重命名工作流程: {old_name} -> {new_name}')
+                else:
+                    logger.error(f'重命名工作流程失败: {old_name} -> {new_name}')
+                dialog.close()
+            except Exception as e:
+                logger.error(f'重命名工作流程异常: {e}')
+                dialog.close()
+
         ui.button('新建流程', icon='add', on_click=show_create_operation_dialog).props('dense')
+        ui.button('重命名当前流程', icon='edit', on_click=show_rename_operation_dialog).props('dense')
         ui.button('删除当前流程', icon='delete', color='negative', on_click=delete_current_operation).props('dense')
         ui.button('复制流程', icon='content_copy', on_click=show_copy_operation_dialog).props('dense')
 

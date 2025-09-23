@@ -141,3 +141,44 @@ def remove_operation(key: str) -> bool:
                 manager.current_operation = ""
         return True
     return False
+
+def rename_operation(old_name: str, new_name: str) -> bool:
+    """重命名工作流程配置"""
+    manager = get_operation_manager()
+    if old_name not in manager.operations:
+        return False
+    if new_name in manager.operations:
+        return False  # 新名称已存在
+
+    # 加载旧配置
+    old_config = load_operation_config(old_name)
+    if not old_config:
+        return False
+
+    # 创建新配置
+    new_config = OperationConfig(
+        name=new_name,
+        description=old_config.description,
+        nodes=old_config.nodes
+    )
+
+    # 保存新配置
+    save_operation_config(new_name, new_config)
+
+    # 更新管理器
+    manager.operations.remove(old_name)
+    manager.operations.append(new_name)
+
+    # 如果当前工作流程是重命名的那个，更新当前工作流程
+    if manager.current_operation == old_name:
+        manager.current_operation = new_name
+
+    # 删除旧文件
+    old_path = OPERATION_CONFIG_PATH(old_name)
+    if os.path.exists(old_path):
+        try:
+            os.remove(old_path)
+        except Exception:
+            pass  # 删除失败不影响重命名结果
+
+    return True

@@ -1,6 +1,6 @@
 from typing import Optional
-from ...utils.turret_alignment_utils import turret_align_front_to_light_column
-from ...utils.communicate_utils import set_turret_yaw
+from ....utils.turret_alignment_utils import turret_align_front_to_light_column
+from ....utils.communicate_utils import turret_set_yaw
 
 class TurretAlignToLight:
     """用 HSV 灯检测，让炮台对准到指定列位置"""
@@ -16,7 +16,7 @@ class TurretAlignToLight:
 
     def run(self) -> bool:
         # 先将炮台移动到中间位置0
-        set_turret_yaw(0.0)
+        turret_set_yaw(0.0)
         
         return turret_align_front_to_light_column(
             cam_key=self.cam_key,  # type: ignore

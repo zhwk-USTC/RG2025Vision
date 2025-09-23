@@ -12,7 +12,7 @@ from core.logger import logger
 from vision import get_vision, CAM_KEY_TYPE
 from .vision_utils import VisionUtils
 from ..debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
-from .communicate_utils import set_turret_yaw  # norm ∈ [-1, 1]
+from .communicate_utils import turret_set_yaw  # norm ∈ [-1, 1]
 
 # ---------------------------
 # 可调参数
@@ -96,7 +96,7 @@ def turret_align_front_to_light_column(
     target_px = _target_to_px(target_column, width)
 
     cur_norm = _clamp_norm(start_norm)
-    set_turret_yaw(cur_norm)
+    turret_set_yaw(cur_norm)
     time.sleep(SETTLE_SEC)
 
     for it in range(MAX_ITERS):
@@ -127,7 +127,7 @@ def turret_align_front_to_light_column(
 
         # 更新并下发
         cur_norm = _clamp_norm(cur_norm + step)
-        set_turret_yaw(cur_norm)
+        turret_set_yaw(cur_norm)
 
         # 调试信息
         set_debug_var(f"{debug_prefix}_loop",

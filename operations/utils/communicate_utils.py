@@ -142,7 +142,7 @@ def fire_once():
     wait_for_ack(Var.OK, int(Var.FIRE_ONCE), 30)
 
 # --- 炮台相关 ---
-def set_turret_yaw(angle: float):
+def turret_set_yaw(angle: float):
     # 确保角度在有效范围内
     angle = max(-1.0, min(1.0, angle))
     send_kv({Var.TURRET_ANGLE_YAW: angle})

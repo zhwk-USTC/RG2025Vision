@@ -1,5 +1,5 @@
 from core.logger import logger
-from ...debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
+from ....debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
 class ResetCounter:
     """
@@ -25,7 +25,7 @@ class ResetCounter:
         """
         try:
             # 从TaskExecutor的execution_context重置计数器
-            from ...executor.task_executor import _task_executor
+            from ....executor.task_executor import _task_executor
 
             # 将计数器重置为0
             _task_executor.execution_context[self.context_key] = 0

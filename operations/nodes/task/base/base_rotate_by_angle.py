@@ -1,6 +1,6 @@
 from typing import Optional
-from ...utils.communicate_utils import imu_get_yaw, base_set_rotate, base_stop
-from ...utils.base_movement_utils import MovementUtils
+from ....utils.communicate_utils import imu_get_yaw, base_set_rotate, base_stop
+from ....utils.base_movement_utils import MovementUtils
 import time
 import math
 

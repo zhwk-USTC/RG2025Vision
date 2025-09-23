@@ -137,7 +137,6 @@ class VisionUtils:
     @staticmethod
     def detect_hsv_with_retry(
         cam_key: CAM_KEY_TYPE,
-        target_label: str,
         max_retries: int = 20,
         interval_sec: float = 0.05,
         debug_prefix: str = "hsv",
@@ -183,8 +182,8 @@ class VisionUtils:
 
                 if not dets:
                     if iter_cnt >= max_retries:
-                        logger.error(f"[{task_name}] 未检测到HSV目标: {target_label}")
-                        set_debug_var(f'{debug_prefix}_error', f'no hsv target found: {target_label}',
+                        logger.error(f"[{task_name}] 未检测到HSV目标")
+                        set_debug_var(f'{debug_prefix}_error', 'no hsv target found',
                                       DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{task_name}目标")
                         return None, None
                     iter_cnt += 1
@@ -213,3 +212,33 @@ class VisionUtils:
                 time.sleep(interval_sec)
 
         return None, None
+    
+
+    @staticmethod
+    def set_cam_exposure(cam_key: CAM_KEY_TYPE, exposure_raw: float) -> bool:
+        """设置摄像头曝光时间"""
+        vs = get_vision()
+        if not vs:
+            set_debug_var('vision_error', 'vision not ready', DebugLevel.ERROR, DebugCategory.ERROR, "视觉系统未准备就绪")
+            return False
+
+        cam = vs._cameras.get(cam_key)
+        if cam is None:
+            set_debug_var('camera_error', 'camera not found', DebugLevel.ERROR, DebugCategory.ERROR, f"未找到摄像头 {cam_key}")
+            return False
+        
+        if not cam.is_open:
+            logger.info(f"[VisionUtils] 摄像头 {cam_key} 未连接，正在连接...")
+            if not cam.connect():
+                set_debug_var('camera_error', 'camera connect failed', DebugLevel.ERROR, DebugCategory.ERROR, f"摄像头 {cam_key} 连接失败")
+                return False
+            logger.info(f"[VisionUtils] 摄像头 {cam_key} 连接成功")
+
+        try:
+            cam._config.exposure = exposure_raw
+            cam._set_exposure_smart()
+            logger.info(f"[VisionUtils] 摄像头 {cam_key} 曝光时间设置为 {exposure_raw}")
+            return True
+        except Exception as e:
+            set_debug_var('camera_error', f'set exposure error: {str(e)}', DebugLevel.ERROR, DebugCategory.ERROR, f"设置摄像头 {cam_key} 曝光时间异常: {str(e)}")
+            return False

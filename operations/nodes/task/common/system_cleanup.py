@@ -1,8 +1,8 @@
 from core.logger import logger
 from vision import get_vision
 from communicate import stop_serial
-from ...utils.communicate_utils import base_stop
-from ...debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
+from operations.utils.communicate_utils import base_stop
+from operations.debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 import time
 
 class SystemCleanup:
@@ -16,7 +16,7 @@ class SystemCleanup:
     def __init__(self, 
                  stop_base: bool = True,
                  stop_vision: bool = False,  # 默认不关闭视觉系统
-                 stop_communication: bool = True,
+                 stop_communication: bool = False,
                  exit_delay: float = 1.0):
         """
         参数：

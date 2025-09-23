@@ -51,11 +51,10 @@ def _target_to_px(target_column, width: int) -> float:
     return t * (width - 1)
 
 def _measure_u_px(
-    cam_key, target_hsv_label, max_retries, debug_prefix, task_name
+    cam_key, max_retries, debug_prefix, task_name
 ) -> Optional[float]:
     det, _ = VisionUtils.detect_hsv_with_retry(
         cam_key=cam_key,
-        target_label=target_hsv_label,
         max_retries=max_retries,
         interval_sec=0.03,
         debug_prefix=debug_prefix,
@@ -89,7 +88,6 @@ def turret_align_front_to_light_column(
     cam_key: Literal["front"] = "front",
     target_column: float = 0.5,         # 0~1 归一化 或 像素列(>1)
     pixel_tolerance: int = PIX_TOL,
-    target_hsv_label: Optional[str] = None,
     start_norm: float = 0.0,
     debug_prefix: str = "turret_align",
     task_name: str = "TurretAlignToLight"
@@ -102,7 +100,7 @@ def turret_align_front_to_light_column(
     time.sleep(SETTLE_SEC)
 
     for it in range(MAX_ITERS):
-        u_px = _measure_u_px(cam_key, target_hsv_label, MAX_RETRIES_PER_ITER, debug_prefix, task_name)
+        u_px = _measure_u_px(cam_key, MAX_RETRIES_PER_ITER, debug_prefix, task_name)
         if u_px is None:
             set_debug_var(f"{debug_prefix}_status", "no_detection",
                           DebugLevel.WARNING, DebugCategory.STATUS, "未检测到灯")

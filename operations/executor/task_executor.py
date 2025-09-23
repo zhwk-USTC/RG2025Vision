@@ -72,25 +72,28 @@ class TaskExecutor:
         self.execution_context.clear()
 
         self.load_from_config()
-        if not self.flow:
-            logger.error("没有可执行的流程配置")
-            return False
-
-        reset_debug_vars()
-        set_debug_var('task_process_status', 'starting', DebugLevel.INFO, DebugCategory.STATUS, "任务流程开始")
-        set_debug_var('flow_config', [getattr(n, 'id', '?') for n in self.flow],
-                      DebugLevel.INFO, DebugCategory.STATUS, f"流程配置: {len(self.flow)} 个节点")
-
-        # 仅为 target 节点建表：id -> index
-        target_map: Dict[str, int] = {
-            n.id: idx
-            for idx, n in enumerate(self.flow)
-            if getattr(n, "id", None) and getattr(n, "type", None) == "target"
-        }
-
-        has_failed_tasks = False  # 跟踪是否有任务失败
-
         try:
+            # 启动前运行 system_init
+            self._execute_task_node('system_init', 'system_init', {})
+
+            if not self.flow:
+                logger.error("没有可执行的流程配置")
+                return False
+
+            reset_debug_vars()
+            set_debug_var('task_process_status', 'starting', DebugLevel.INFO, DebugCategory.STATUS, "任务流程开始")
+            set_debug_var('flow_config', [getattr(n, 'id', '?') for n in self.flow],
+                          DebugLevel.INFO, DebugCategory.STATUS, f"流程配置: {len(self.flow)} 个节点")
+
+            # 仅为 target 节点建表：id -> index
+            target_map: Dict[str, int] = {
+                n.id: idx
+                for idx, n in enumerate(self.flow)
+                if getattr(n, "id", None) and getattr(n, "type", None) == "target"
+            }
+
+            has_failed_tasks = False  # 跟踪是否有任务失败
+
             i = 0
             while i < len(self.flow):
                 if is_stop_requested():
@@ -152,6 +155,10 @@ class TaskExecutor:
             set_debug_var('task_process_status', f'error: {e}', DebugLevel.ERROR, DebugCategory.ERROR,
                           f"任务流程执行异常: {e}")
             return False
+
+        finally:
+            # 结束前运行 system_cleanup
+            self._execute_task_node('system_cleanup', 'system_cleanup', {})
 
     # ---------- 子步骤：任务节点 ----------
     def _execute_task_node(self, node_id: str, class_name: str, parameters: Dict[str, Any]) -> bool:

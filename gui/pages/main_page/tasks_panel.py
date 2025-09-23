@@ -151,9 +151,28 @@ def render_single_step_panel(ctx: UIPanelContext):
         def _worker():
             try:
                 logger.info(f'[single-step] {step_name} params={param_values}')
+                # 启动前运行 system_init
+                init_cls = _TASK_NODE_CLASSES.get('system_init')
+                if init_cls:
+                    try:
+                        init_cls().run()
+                        logger.info('[single-step] system_init 执行完成')
+                    except Exception as e:
+                        logger.error(f'[single-step] system_init 执行异常: {e}')
+                # 执行单个任务
                 task_cls(**param_values).run()
+                logger.info(f'[single-step] {step_name} 执行完成')
             except Exception as e:
                 logger.error(f'[single-step] 执行 {step_name} 异常: {e}')
+            finally:
+                # 结束前运行 system_cleanup
+                cleanup_cls = _TASK_NODE_CLASSES.get('system_cleanup')
+                if cleanup_cls:
+                    try:
+                        cleanup_cls().run()
+                        logger.info('[single-step] system_cleanup 执行完成')
+                    except Exception as e:
+                        logger.error(f'[single-step] system_cleanup 执行异常: {e}')
 
         t = threading.Thread(target=_worker, daemon=True)
         _single_task_thread[0] = t

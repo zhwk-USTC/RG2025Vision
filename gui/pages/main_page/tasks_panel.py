@@ -225,6 +225,70 @@ def render_single_step_panel(ctx: UIPanelContext):
 def render_flow_panel(ctx: UIPanelContext):
     """渲染流程区（管理 + 配置 + 运行）"""
     
+    _flow_single_task_thread: list[Optional[threading.Thread]] = [None]
+
+    def _start_flow_single_task_thread(idx: int):
+        if _flow_single_task_thread[0] and _flow_single_task_thread[0].is_alive():
+            logger.warning('已有流程单步任务在运行中')
+            return
+        if is_task_process_running():
+            logger.warning('主流程正在运行，无法单步调试')
+            return
+        item = ctx.nodes_state[idx]
+        if item.get('type') != 'task':
+            logger.warning('只能运行任务节点')
+            return
+        task_name = item.get('name')
+        if not task_name:
+            logger.error('任务名称为空')
+            return
+        task_cls = _TASK_NODE_CLASSES.get(task_name)
+        if not task_cls:
+            logger.error(f'未知任务类: {task_name}')
+            return
+
+        # 获取参数
+        param_values = {}
+        if '__param_widgets' in item:
+            for pname, param in _ctor_params(task_cls):
+                w = item['__param_widgets'].get(pname)
+                if not w:
+                    continue
+                d, a = _param_default_annot(param)
+                v = _read_param_widget(w, a, d)
+                if v is not None:
+                    param_values[pname] = v
+
+        def _worker():
+            try:
+                logger.info(f'[flow-single-step] {task_name} params={param_values}')
+                # 启动前运行 system_init
+                init_cls = _TASK_NODE_CLASSES.get('system_init')
+                if init_cls:
+                    try:
+                        init_cls().run()
+                        logger.info('[flow-single-step] system_init 执行完成')
+                    except Exception as e:
+                        logger.error(f'[flow-single-step] system_init 执行异常: {e}')
+                # 执行单个任务
+                task_cls(**param_values).run()
+                logger.info(f'[flow-single-step] {task_name} 执行完成')
+            except Exception as e:
+                logger.error(f'[flow-single-step] 执行 {task_name} 异常: {e}')
+            finally:
+                # 结束前运行 system_cleanup
+                cleanup_cls = _TASK_NODE_CLASSES.get('system_cleanup')
+                if cleanup_cls:
+                    try:
+                        cleanup_cls().run()
+                        logger.info('[flow-single-step] system_cleanup 执行完成')
+                    except Exception as e:
+                        logger.error(f'[flow-single-step] system_cleanup 执行异常: {e}')
+
+        t = threading.Thread(target=_worker, daemon=True)
+        _flow_single_task_thread[0] = t
+        t.start()
+    
     # === 颜色与样式常量（放在 render_flow_panel(ctx) 内，三函数上方）===
     STYLE = {
         'task':    {'border': 'border-blue-500',    'icon': 'play_arrow',   'icon_cls': 'text-blue-600',    'title_cls': 'text-blue-700'},
@@ -547,16 +611,22 @@ def render_flow_panel(ctx: UIPanelContext):
 
                 # 展开项
                 with ui.expansion('参数', value=False).classes('w-full mt-2'):
-                    # 参数区
-                    param_widgets = {}
-                    name = item.get('name')
-                    if name in _TASK_NODE_CLASSES:
-                        params = _ctor_params(_TASK_NODE_CLASSES[name])
-                        if params:
-                            with ui.column().classes('gap-2 flex-1'):
-                                for pname, p in params:
-                                    cur = (item.get('parameters') or {}).get(pname)
-                                    param_widgets[pname] = _create_param_input(pname, p, preset=cur)
+                    with ui.row().classes('items-start gap-3 w-full'):
+                        # 参数区
+                        param_widgets = {}
+                        name = item.get('name')
+                        if name in _TASK_NODE_CLASSES:
+                            params = _ctor_params(_TASK_NODE_CLASSES[name])
+                            if params:
+                                with ui.column().classes('gap-2 flex-1'):
+                                    for pname, p in params:
+                                        cur = (item.get('parameters') or {}).get(pname)
+                                        param_widgets[pname] = _create_param_input(pname, p, preset=cur)
+
+                        # 运行按钮
+                        btn = ui.button('单步调试', color='primary', icon='play_arrow').classes('text-sm px-3')
+                        btn.on('click', lambda: _start_flow_single_task_thread(idx))
+                        ctx.step_cards[f'flow_{idx}'] = btn
 
                 # 回写引用
                 item['__param_widgets'] = param_widgets

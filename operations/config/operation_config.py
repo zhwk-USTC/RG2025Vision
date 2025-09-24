@@ -139,6 +139,15 @@ def remove_operation(key: str) -> bool:
                 manager.current_operation = manager.operations[0]
             else:
                 manager.current_operation = ""
+        
+        # 删除对应的配置文件
+        config_path = OPERATION_CONFIG_PATH(key)
+        if os.path.exists(config_path):
+            try:
+                os.remove(config_path)
+            except Exception:
+                pass  # 删除失败不影响移除结果
+        
         return True
     return False
 

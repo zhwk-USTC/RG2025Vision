@@ -1,4 +1,3 @@
-
 from typing import Optional, List
 import time
 from vision import get_vision, CAM_KEY_TYPE
@@ -123,16 +122,11 @@ class VisionUtils:
                     continue
 
             # 从候选标签中选择一个
-            if VisionUtils._last_tag_center is not None:
-                # 有上一个标签，选择距离最近的
-                det = min(candidate_dets, key=lambda d: ((getattr(d, 'center', [0, 0])[0] - VisionUtils._last_tag_center[0]) ** 2 +  # type: ignore
-                                                         (getattr(d, 'center', [0, 0])[1] - VisionUtils._last_tag_center[1]) ** 2) ** 0.5)  # type: ignore
-            else:
-                # 没有上一个标签，选择最左边的
-                det = min(candidate_dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
+            # 仅选择最靠近中间列的标签
+            height, width = frame.shape[:2]
+            center_x = width / 2
+            det = min(candidate_dets, key=lambda d: abs(getattr(d, 'center', [center_x, 0])[0] - center_x))
 
-            # 更新上一个标签的中心坐标
-            VisionUtils._last_tag_center = getattr(det, 'center', None)
             set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
                           DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
 

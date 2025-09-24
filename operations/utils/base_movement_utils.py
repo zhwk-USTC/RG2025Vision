@@ -20,7 +20,7 @@ ROT_PULSE_MAX_SEC = 2.00
 
 # 速度参数（米/秒）
 MOVE_SPEED_SLOW_MPS = 0.1    # 慢速移动速度
-MOVE_SPEED_FAST_MPS = 0.3    # 快速移动速度
+MOVE_SPEED_FAST_MPS = 0.5    # 快速移动速度
 MOVE_FAST_THR_M = 0.30      # 平移快慢阈值（m）
 
 # 旋转速度参数（弧度/秒）
@@ -53,11 +53,10 @@ class MovementUtils:
             move_cmd: 移动命令
             pulse_sec: 移动脉冲时长（秒）
         """
-        pulse_sec = max(MOVE_PULSE_MIN_SEC, min(MOVE_PULSE_MAX_SEC, pulse_sec))
         if not move_cmd or pulse_sec <= 0:
             base_stop()
             return
-
+        pulse_sec = max(MOVE_PULSE_MIN_SEC, pulse_sec)
         base_set_move(move_cmd)
         time.sleep(pulse_sec)
         base_stop()
@@ -72,7 +71,7 @@ class MovementUtils:
             rot_cmd: 旋转命令
             pulse_sec: 旋转脉冲时长（秒）
         """
-        pulse_sec = max(ROT_PULSE_MIN_SEC, min(ROT_PULSE_MAX_SEC, pulse_sec))
+        pulse_sec = max(ROT_PULSE_MIN_SEC, pulse_sec)
         if not rot_cmd or pulse_sec <= 0:
             base_stop()
             return
@@ -111,7 +110,7 @@ class MovementUtils:
             speed = MOVE_SPEED_FAST_MPS
 
         # 根据速度选择移动脉冲时长
-        pulse_sec = distance_m * 0.8 / speed
+        pulse_sec = distance_m * 0.5 / speed
 
         # 根据方向选择移动命令
         move_cmd = f"{move_dir}{speed_suffix}"

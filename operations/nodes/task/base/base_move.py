@@ -35,9 +35,9 @@ class BaseMove:
             set_debug_var('base_move_duration', self.duration, 
                          DebugLevel.INFO, DebugCategory.CONTROL, "底盘移动持续时间")
             
-            # 执行移动（使用平滑移动）
+            # 执行移动
             move_command = f"{self.direction}_{self.speed}"
-            MovementUtils.execute_smooth_move(move_command, self.duration)  # type: ignore
+            MovementUtils.execute_move(move_command, self.duration)  # type: ignore
             
             logger.info("[BaseMove] 移动完成")
             set_debug_var('base_move_status', 'success', 

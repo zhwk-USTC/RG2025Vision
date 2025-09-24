@@ -183,6 +183,10 @@ class AlignmentUtils:
         max_retries: int = 20
         
     ) -> bool:
+        # 确保 target_tag_id 是 int 类型
+        if target_tag_id is not None:
+            target_tag_id = int(target_tag_id)
+        
         if not VisionUtils.check_vision_system(f'{debug_prefix}_error'):
             return False
 
@@ -277,6 +281,10 @@ def base_align_to_apriltag(
     - tolerance_z: Z轴允许误差（前后容差）
     - tolerance_yaw: Yaw角度允许误差
     """
+    # 确保 target_tag_id 是 int 类型
+    if target_tag_id is not None:
+        target_tag_id = int(target_tag_id)
+    
     return AlignmentUtils.apriltag_alignment_loop(
         cam_key, 
         target_tag_families,

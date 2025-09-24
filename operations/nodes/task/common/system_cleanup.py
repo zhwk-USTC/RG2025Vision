@@ -16,7 +16,7 @@ class SystemCleanup:
     def __init__(self, 
                  stop_base: bool = True,
                  stop_vision: bool = False,  # 默认不关闭视觉系统
-                 stop_communication: bool = False,
+                 stop_communication: bool = True,
                  exit_delay: float = 1.0):
         """
         参数：

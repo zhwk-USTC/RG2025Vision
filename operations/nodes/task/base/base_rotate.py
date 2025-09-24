@@ -34,10 +34,10 @@ class BaseRotate:
                          DebugLevel.INFO, DebugCategory.CONTROL, "底盘旋转方向和速度")
             set_debug_var('base_rotate_duration', self.duration, 
                          DebugLevel.INFO, DebugCategory.CONTROL, "底盘旋转持续时间")
-            
-            # 执行旋转（使用平滑旋转）
+
+            # 执行旋转
             rotate_command = f"{self.direction}_{self.speed}"
-            MovementUtils.execute_smooth_rotate(rotate_command, self.duration)  # type: ignore
+            MovementUtils.execute_rotate(rotate_command, self.duration)  # type: ignore
             
             logger.info("[BaseRotate] 旋转完成")
             set_debug_var('base_rotate_status', 'success', 

@@ -325,7 +325,8 @@ class TaskExecutor:
             # 创建临时执行器来执行子流程
             sub_executor = TaskExecutor()
             sub_executor.flow = list(subflow_config.nodes)
-            sub_executor.execution_context = dict(self.execution_context)  # 继承上下文
+            # 直接共享父流程的执行上下文，实现完全透传
+            sub_executor.execution_context = self.execution_context
             # 传递递归栈给子执行器
             sub_executor._recursion_stack = list(self._recursion_stack)
 
@@ -346,9 +347,6 @@ class TaskExecutor:
     def _execute_flow_without_init_cleanup(self) -> bool:
         """执行流程但不运行 system_init 和 system_cleanup（用于子流程）"""
         global _stop_requested
-
-        # 每次执行前重置执行上下文，确保状态不会跨执行保留
-        self.execution_context.clear()
 
         try:
             if not self.flow:

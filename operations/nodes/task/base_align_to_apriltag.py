@@ -5,7 +5,7 @@ class BaseAlignToAprilTag:
     """用 AprilTag 位姿闭环，让底盘移动到飞镖架下方并保持距离"""
 
     def __init__(self, 
-                 cam_key: str, 
+                 cam_key: str = 'left', 
                  tag_families: str = 'tag36h11',
                  tag_id: Optional[int] = None, 
                  tag_size: float = 0.12,
@@ -16,6 +16,10 @@ class BaseAlignToAprilTag:
                  tolerance_z: float = DEFAULT_TOLERANCE_XY,
                  tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
                  ):
+        # 确保 tag_id 是 int 类型
+        if tag_id is not None:
+            tag_id = int(tag_id)
+        
         self.cam_key = cam_key
         self.tag_families = tag_families
         self.tag_id = tag_id

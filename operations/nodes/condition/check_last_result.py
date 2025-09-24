@@ -2,7 +2,7 @@ from typing import Optional
 from core.logger import logger
 from ...debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 
-class CheckLastTaskResult:
+class CheckLastResult:
     """
     检查上一个任务结果的条件节点
     逻辑：只有上一个任务明确失败(False)时返回False，其他情况都返回True

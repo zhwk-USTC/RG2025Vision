@@ -30,8 +30,8 @@ class CounterReset:
             # 将计数器重置为0
             _task_executor.execution_context[self.context_key] = 0
 
-            logger.info(f"[ResetCounter] 计数器 '{self.context_key}' 已重置为0")
-            set_debug_var('task_reset_counter', {
+            logger.info(f"[CounterReset] 计数器 '{self.context_key}' 已重置为0")
+            set_debug_var('task_counter_reset', {
                 'context_key': self.context_key,
                 'reset_value': 0,
                 'result': 'success'
@@ -41,8 +41,8 @@ class CounterReset:
             return True
 
         except Exception as e:
-            logger.error(f"[ResetCounter] 重置计数器异常: {e}")
-            set_debug_var('task_reset_counter_error', {
+            logger.error(f"[CounterReset] 重置计数器异常: {e}")
+            set_debug_var('task_counter_reset_error', {
                 'context_key': self.context_key,
                 'error': str(e),
                 'result': 'failed'

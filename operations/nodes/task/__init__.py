@@ -8,7 +8,9 @@ from .common.system_cleanup import SystemCleanup
 from .common.system_init import SystemInit
 from .turret.turret_align_to_light import TurretAlignToLight
 from .turret.turret_set_yaw import TurretSetYaw
-from .common.reset_counter import ResetCounter
+from .common.counter_increment import CounterIncrement
+from .common.counter_decrement import CounterDecrement
+from .common.counter_set import CounterSet
 from .common.set_camera_exposure import SetCameraExposure
 
 # 汇总所有任务节点类
@@ -30,6 +32,8 @@ _TASK_NODE_CLASSES = {
     'system_init': SystemInit,
     'turret_align_to_light': TurretAlignToLight,
     'turret_set_yaw': TurretSetYaw,
-    'reset_counter': ResetCounter,
+    'counter_increment': CounterIncrement,
+    'counter_decrement': CounterDecrement,
+    'counter_set': CounterSet,
     'set_camera_exposure': SetCameraExposure,
 }

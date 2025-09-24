@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Optional, List
 import time
 from vision import get_vision, CAM_KEY_TYPE
 from core.logger import logger
@@ -8,6 +8,9 @@ from ..debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, De
 
 class VisionUtils:
     """视觉相关工具函数"""
+
+    # 存储上一个检测到的AprilTag的中心坐标
+    _last_tag_center: Optional[List[float]] = None
 
     @staticmethod
     def check_vision_system(error_prefix: str = "vision_error") -> bool:
@@ -102,14 +105,14 @@ class VisionUtils:
                 time.sleep(retry_delay)
                 continue
 
-            # 选择目标标签：选择最左边的（满足ID条件的）标签
+            # 选择目标标签：选择与上一个返回值距离最近的满足条件的标签
             if target_tag_id is None:
-                # 未指定ID时选择最左边的标签（按中心x坐标排序）
-                det = min(dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
+                # 未指定ID时，选择所有检测到的标签
+                candidate_dets = dets
             else:
-                # 指定了ID时，在满足ID条件的标签中选择最左边的
-                matching_dets = [d for d in dets if getattr(d, 'tag_id', None) == target_tag_id]
-                if not matching_dets:
+                # 指定了ID时，选择匹配ID的标签
+                candidate_dets = [d for d in dets if getattr(d, 'tag_id', None) == target_tag_id]
+                if not candidate_dets:
                     if iter_cnt >= max_retries:
                         logger.error(f"[{debug_description}] 未找到指定ID={target_tag_id}的标签")
                         set_debug_var(f'{debug_prefix}_error', f'target tag {target_tag_id} not found',
@@ -118,8 +121,18 @@ class VisionUtils:
                     iter_cnt += 1
                     time.sleep(retry_delay)
                     continue
-                # 在匹配ID的标签中选择最左边的
-                det = min(matching_dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
+
+            # 从候选标签中选择一个
+            if VisionUtils._last_tag_center is not None:
+                # 有上一个标签，选择距离最近的
+                det = min(candidate_dets, key=lambda d: ((getattr(d, 'center', [0, 0])[0] - VisionUtils._last_tag_center[0]) ** 2 +  # type: ignore
+                                                         (getattr(d, 'center', [0, 0])[1] - VisionUtils._last_tag_center[1]) ** 2) ** 0.5)  # type: ignore
+            else:
+                # 没有上一个标签，选择最左边的
+                det = min(candidate_dets, key=lambda d: getattr(d, 'center', [float('inf'), 0])[0])
+
+            # 更新上一个标签的中心坐标
+            VisionUtils._last_tag_center = getattr(det, 'center', None)
             set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
                           DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
 
@@ -190,10 +203,13 @@ class VisionUtils:
                     time.sleep(interval_sec)
                     continue
 
-                # 选择检测结果（通常选择面积最大的或置信度最高的）
+                # 选择检测结果：选择距离图像中心列最近的
                 if isinstance(dets, list) and len(dets) > 0:
-                    # 选择得分最高的检测结果
-                    det = max(dets, key=lambda d: getattr(d, 'score', 0))
+                    # 获取图像宽度，计算中心列
+                    height, width = frame.shape[:2]
+                    center_x = width / 2
+                    # 选择距离中心列最近的检测结果
+                    det = min(dets, key=lambda d: abs(getattr(d, 'center', [center_x, 0])[0] - center_x))
                 else:
                     det = dets
 

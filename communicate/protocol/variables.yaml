@@ -20,9 +20,13 @@ variables:
     vtype: BOOL
   - name: base_move_forward_slow       # 慢速向前移动
     vtype: BOOL
+  - name: base_move_forward_fast_ex   # 超快速向前移动
+    vtype: BOOL
   - name: base_move_backward_fast      # 快速向后移动
     vtype: BOOL
   - name: base_move_backward_slow      # 慢速向后移动
+    vtype: BOOL
+  - name: base_move_backward_fast_ex  # 超快速向后移动
     vtype: BOOL
   - name: base_move_left_fast          # 快速向左移动
     vtype: BOOL
@@ -50,82 +54,60 @@ variables:
   - name: imu_reset            # IMU复位, True表示复位
     vtype: BOOL
 
-  - name: debug_left_front_wheel_pwm   # 左前轮PWM速度
-    vtype: U16
-  - name: debug_left_front_wheel_dir   # 左前轮方向
-    vtype: U8
-  - name: debug_right_front_wheel_pwm  # 右前轮PWM速度
-    vtype: U16
-  - name: debug_right_front_wheel_dir  # 右前轮方向
-    vtype: U8
-  - name: debug_left_rear_wheel_pwm    # 左后轮PWM速度
-    vtype: U16
-  - name: debug_left_rear_wheel_dir    # 左后轮方向
-    vtype: U8
-  - name: debug_right_rear_wheel_pwm   # 右后轮PWM速度
-    vtype: U16
-  - name: debug_right_rear_wheel_dir   # 右后轮方向
-    vtype: U8
-
   # --- 机械臂相关 ---
-  - name: gripper_tag_x   # tag相对机械爪的x, 单位：m
-    vtype: F32
-  - name: gripper_tag_y   # tag相对机械爪的y, 单位：m
-    vtype: F32
-  - name: gripper_tag_z   # tag相对机械爪的z, 单位：m
-    vtype: F32
-
-  - name: arm_reset         # 机械臂初始位置
-    vtype: BOOL
-  - name: arm_reset_to_prepare   # 机械臂从初始位置移动到准备位置
-    vtype: BOOL
-  - name: arm_grasp_dart    # 抓取
-    vtype: BOOL
-  - name: arm_load_dart     # 从抓取到装填，再回到初始位置
+  - name: arm_reset                       # 上电进入复位
     vtype: BOOL
 
-  - name: arm_relax        # 机械臂放松
+  - name: arm_reset_to_low_prepare        # 复位 -> 低位准备
     vtype: BOOL
 
-  # --- 机械臂关节调试变量 ---
-  - name: debug_arm_di_pwm         # 底座关节PWM值 (250-1250)
-    vtype: U16
-  - name: debug_arm_dabi_pwm       # 大臂关节PWM值 (250-1250)
-    vtype: U16
-  - name: debug_arm_zhongbi_pwm    # 中臂关节PWM值 (250-1250)
-    vtype: U16
-  - name: debug_arm_xiaobi_pwm     # 小臂关节PWM值 (250-1250)
-    vtype: U16
-  - name: debug_arm_shouwan_pwm    # 手腕关节PWM值 (250-1250)
-    vtype: U16
-  - name: debug_arm_gripper_pwm    # 夹爪PWM值 (250-1250)
-    vtype: U16
-
-  - name: debug_gripper_grasp      # 机械爪抓取调试，True表示执行抓取动作
+  - name: arm_low_prepare_to_low_grip     # 低位准备 -> 低位夹取
     vtype: BOOL
-  - name: debug_gripper_release    # 机械爪放开调试，True表示执行放开动作
+
+  - name: arm_low_grip_to_reset_gripping  # 低位夹取 -> 抓取复位
+    vtype: BOOL
+
+  - name: arm_reset_to_high_prepare       # 复位 -> 高位准备
+    vtype: BOOL
+
+  - name: arm_high_prepare_to_high_grip   # 高位准备 -> 高位夹取
+    vtype: BOOL
+
+  - name: arm_high_grip_to_reset_gripping # 高位夹取 -> 抓取复位
+    vtype: BOOL
+
+  - name: arm_reset_gripping_to_store     # 抓取复位 -> 存储
+    vtype: BOOL
+
+  - name: arm_reset_gripping_to_shot      # 抓取复位 -> 射击
+    vtype: BOOL
+
+  - name: arm_store_to_reset_gripping     # 存储 -> 抓取复位
+    vtype: BOOL
+
+  - name: arm_store_to_reset              # 存储 -> 复位（返回初始状态）
+    vtype: BOOL
+
+  - name: arm_shot_to_reset               # 射击 -> 复位（返回初始状态）
+    vtype: BOOL
+
+
+  - name: arm_relax        # 机械臂掉电
     vtype: BOOL
 
   # --- 发射相关 ---
-  - name: friction_wheel_speed  # 摩擦轮速度，单位：m/s
-    vtype: F32
+
   - name: fire_once         # 发射飞镖, 复合指令
     vtype: BOOL
 
-  - name: debug_dart_push_once         # 推进飞镖向前,然后回到原位
-    vtype: BOOL
-  - name: debug_dart_push_forward           # 推进飞镖向前
-    vtype: BOOL
-  - name: debug_dart_push_backward         # 推进飞镖向后
-    vtype: BOOL
-  - name: debug_dart_push_stop             # 停止推进飞镖
-    vtype: BOOL
-  - name: debug_dart_push_reset            # 推进飞镖复位
+  - name: dart_push_once         # 推进飞镖向前,然后回到原位
     vtype: BOOL
 
-  - name: debug_friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
+  - name: friction_wheel_speed  # 摩擦轮速度，单位：m/s
+    vtype: F32
+  - name: friction_wheel_start  # 启动摩擦轮，True表示启动摩擦轮
     vtype: BOOL
-  - name: debug_friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮
+  - name: friction_wheel_stop   # 停止摩擦轮，True表示停止摩擦轮
     vtype: BOOL
 
     

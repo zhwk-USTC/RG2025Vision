@@ -658,11 +658,14 @@ def render_flow_panel(ctx: UIPanelContext):
                     # 任务选择
                     sel = ui.select(
                         task_choices,
-                        value=item.get('name'),
+                        value=item.get('name') if item.get('name') in task_choices else (task_choices[0] if task_choices else ''),
                         label='任务',
                         clearable=False,
                         on_change=lambda e, i=idx: _on_task_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
+
+                    # 更新item的name以反映重置
+                    item['name'] = sel.value
 
                     # 控制按钮
                     _render_controls(idx)
@@ -702,11 +705,14 @@ def render_flow_panel(ctx: UIPanelContext):
                     # 条件类选择
                     sel = ui.select(
                         cond_choices,
-                        value=item.get('name'),
+                        value=item.get('name') if item.get('name') in cond_choices else (cond_choices[0] if cond_choices else ''),
                         label='跳转条件',
                         clearable=False,
                         on_change=lambda e, i=idx: _on_cond_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
+                    
+                    # 更新item的name以反映重置
+                    item['name'] = sel.value
                     
                     # 控制按钮
                     _render_controls(idx)
@@ -799,11 +805,14 @@ def render_flow_panel(ctx: UIPanelContext):
                     flow_choices = list_available_operations()
                     sel = ui.select(
                         flow_choices,
-                        value=item.get('name'),
+                        value=item.get('name') if item.get('name') in flow_choices else (flow_choices[0] if flow_choices else ''),
                         label='子流程',
                         clearable=False,
                         on_change=lambda e, i=idx: _on_subflow_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
+
+                    # 更新item的name以反映重置
+                    item['name'] = sel.value
 
                     # 控制按钮
                     _render_controls(idx)

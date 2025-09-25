@@ -3,4 +3,4 @@ class JUMP:
         pass
     
     def run(self) -> bool:
-        return False
+        return True

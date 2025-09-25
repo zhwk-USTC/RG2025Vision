@@ -552,7 +552,7 @@ def render_flow_panel(ctx: UIPanelContext):
     # ---------- 流程配置 ----------
     ui.separator().classes('my-2')
     ui.label('流程配置').classes('text-md font-bold text-blue-600')
-    ui.label('条件节点返回 False 时跳到“同 id 的 target”（保存时自动生成）').classes('text-sm text-gray-600 mb-2')
+    ui.label('条件节点返回 True 时跳到"同 id 的 target"').classes('text-sm text-gray-600 mb-2')
 
     TYPE_TASK = 'task'
     TYPE_COND = 'condition'
@@ -697,13 +697,13 @@ def render_flow_panel(ctx: UIPanelContext):
                 with ui.row().classes('items-center w-full gap-3 no-wrap'):
                     ui.icon(STYLE[kind]['icon']).classes(STYLE[kind]['icon_cls'])
                     ui.badge(str(idx + 1)).classes('shrink-0 text-base font-bold')
-                    _title_label('Condition', kind)
+                    _title_label('Jump if', kind)
 
                     # 条件类选择
                     sel = ui.select(
                         cond_choices,
                         value=item.get('name'),
-                        label='条件',
+                        label='跳转条件',
                         clearable=False,
                         on_change=lambda e, i=idx: _on_cond_change(e.value, i),
                     ).props('dense outlined').classes('w-56 shrink-0')
@@ -714,8 +714,8 @@ def render_flow_panel(ctx: UIPanelContext):
                 # ID 输入 + 链接提示
                 with ui.row().classes('items-center gap-2'):
                     link_icon = ui.icon('link').classes('text-amber-500')
-                    ui.tooltip('条件为 False 时跳转到相同 ID 的 Target')
-                    id_in = ui.input('节点 ID（与 target 同 id）', value=item.get('id', '')
+                    ui.tooltip('条件为 True 时跳转到相同 ID 的 Target')
+                    id_in = ui.input('节点 ID（与 target 同 id，条件为 True 时跳转）', value=item.get('id', '')
                                     ).props('dense outlined size=sm').classes('w-56')
 
                 # 展开项
@@ -748,7 +748,7 @@ def render_flow_panel(ctx: UIPanelContext):
                     _title_label('Target', kind)
 
                     # 只读 ID
-                    id_in = ui.input('目标 ID（应等于对应条件的 ID）', value=tid
+                    id_in = ui.input('目标 ID（应等于对应条件的 ID，条件为 True 时跳转到此）', value=tid
                                     ).props('dense outlined size=sm readonly').classes('w-56')
 
                     # # 被引用统计（小徽章）

@@ -44,7 +44,7 @@ class TaskExecutor:
     """
     任务执行器：伪线性执行
       - task: 顺序执行
-      - condition: 条件为 True 顺序继续；False 跳到 同 id 的 target 节点
+      - condition: 条件为 True 跳到 同 id 的 target 节点；False 顺序继续
       - target: 占位锚点，到达后顺序继续
     """
 
@@ -211,7 +211,7 @@ class TaskExecutor:
         parameters: Dict[str, Any],
         target_map: Dict[str, int],
     ) -> Optional[int]:
-        """执行条件节点：run() -> bool，False 跳转到同 id 的 target 节点"""
+        """执行条件节点：run() -> bool，True 跳转到同 id 的 target 节点"""
         if not class_name or not isinstance(class_name, str):
             set_debug_var(
                 "condition_config_error",
@@ -259,8 +259,8 @@ class TaskExecutor:
             f"条件节点 {class_name} 结果: {result_bool}"
         )
 
-        # True 顺序继续，False 跳到“同 id 的 target 节点”
-        if result_bool:
+        # True 跳到"同 id 的 target 节点"，False 顺序继续
+        if not result_bool:
             return None
 
         target_idx = target_map.get(node_id)

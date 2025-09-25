@@ -1,5 +1,5 @@
 # Auto-generated. DO NOT EDIT MANUALLY.
-# Generated at UTC 2025-09-25 10:27:03
+# Generated at UTC 2025-09-25 11:31:35
 # Version policy:
 #   PROTOCOL_DATA_VER_FULL = YYYYMMDDHHMMSS (UTC)
 #   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header
@@ -7,8 +7,8 @@
 from enum import IntEnum
 from typing import Dict, Optional, TypedDict
 
-PROTOCOL_DATA_VER_FULL: int = 20250925102703
-PROTOCOL_DATA_VER: int = 0x6F
+PROTOCOL_DATA_VER_FULL: int = 20250925113135
+PROTOCOL_DATA_VER: int = 0x2F
 
 class Msg(IntEnum):
     PC_TO_MCU = 0x01
@@ -20,6 +20,7 @@ class Var(IntEnum):
     ARM_HIGH_GRIP_TO_RESET_GRIPPING = 0x18  # BOOL
     ARM_RESET_GRIPPING_TO_SHOT = 0x19  # BOOL
     TEST_VAR_U8 = 0x1C  # U8
+    ARM_RESET_TO_STORE = 0x1F  # BOOL
     BASE_MOVE_BACKWARD_FAST = 0x21  # BOOL
     ARM_LOW_GRIP_TO_RESET_GRIPPING = 0x26  # BOOL
     BASE_MOVE_FORWARD_FAST_EX = 0x29  # BOOL
@@ -70,6 +71,7 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.ARM_HIGH_GRIP_TO_RESET_GRIPPING): {"key": "arm_high_grip_to_reset_gripping", "vtype": "BOOL", "size": 1},
     int(Var.ARM_RESET_GRIPPING_TO_SHOT): {"key": "arm_reset_gripping_to_shot", "vtype": "BOOL", "size": 1},
     int(Var.TEST_VAR_U8): {"key": "test_var_u8", "vtype": "U8", "size": 1},
+    int(Var.ARM_RESET_TO_STORE): {"key": "arm_reset_to_store", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_BACKWARD_FAST): {"key": "base_move_backward_fast", "vtype": "BOOL", "size": 1},
     int(Var.ARM_LOW_GRIP_TO_RESET_GRIPPING): {"key": "arm_low_grip_to_reset_gripping", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_FORWARD_FAST_EX): {"key": "base_move_forward_fast_ex", "vtype": "BOOL", "size": 1},
@@ -116,6 +118,7 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.ARM_HIGH_GRIP_TO_RESET_GRIPPING): 1,
     int(Var.ARM_RESET_GRIPPING_TO_SHOT): 1,
     int(Var.TEST_VAR_U8): 1,
+    int(Var.ARM_RESET_TO_STORE): 1,
     int(Var.BASE_MOVE_BACKWARD_FAST): 1,
     int(Var.ARM_LOW_GRIP_TO_RESET_GRIPPING): 1,
     int(Var.BASE_MOVE_FORWARD_FAST_EX): 1,

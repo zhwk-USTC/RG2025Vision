@@ -7,7 +7,7 @@ from .arm import (
     ArmResetToLowPrepare, ArmLowPrepareToLowGrip, ArmLowGripToResetGripping,
     ArmResetToHighPrepare, ArmHighPrepareToHighGrip, ArmHighGripToResetGripping,
     ArmResetGrippingToStore, ArmResetGrippingToShot, ArmStoreToResetGripping,
-    ArmStoreToReset, ArmShotToReset
+    ArmStoreToReset, ArmResetToStore, ArmShotToReset
 )
 from .fire_once import FireOnce
 from .common.system_cleanup import SystemCleanup
@@ -39,6 +39,7 @@ _TASK_NODE_CLASSES = {
     'arm_reset_gripping_to_shot': ArmResetGrippingToShot,
     'arm_store_to_reset_gripping': ArmStoreToResetGripping,
     'arm_store_to_reset': ArmStoreToReset,
+    'arm_reset_to_store': ArmResetToStore,
     'arm_shot_to_reset': ArmShotToReset,
     'fire_control': FireOnce,
     'system_cleanup': SystemCleanup,

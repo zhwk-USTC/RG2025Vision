@@ -9,6 +9,7 @@ from .arm_reset_gripping_to_store import ArmResetGrippingToStore
 from .arm_reset_gripping_to_shot import ArmResetGrippingToShot
 from .arm_store_to_reset_gripping import ArmStoreToResetGripping
 from .arm_store_to_reset import ArmStoreToReset
+from .arm_reset_to_store import ArmResetToStore
 from .arm_shot_to_reset import ArmShotToReset
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     'ArmResetGrippingToShot',
     'ArmStoreToResetGripping',
     'ArmStoreToReset',
+    'ArmResetToStore',
     'ArmShotToReset'
 ]

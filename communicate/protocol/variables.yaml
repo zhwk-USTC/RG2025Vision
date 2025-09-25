@@ -88,6 +88,9 @@ variables:
   - name: arm_store_to_reset              # 存储 -> 复位（返回初始状态）
     vtype: BOOL
 
+  - name: arm_reset_to_store         # 复位 -> 存储
+    vtype: BOOL
+
   - name: arm_shot_to_reset               # 射击 -> 复位（返回初始状态）
     vtype: BOOL
 

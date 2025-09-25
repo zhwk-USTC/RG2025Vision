@@ -120,6 +120,11 @@ def arm_reset():
     """上电进入复位"""
     send_kv({Var.ARM_RESET: True})
     wait_for_ack(Var.OK, int(Var.ARM_RESET), 10)
+    
+def arm_reset_to_store():
+    """复位 -> 存储"""
+    send_kv({Var.ARM_RESET_TO_STORE: True})
+    wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_STORE), 10)
 
 def arm_reset_to_low_prepare():
     """复位 -> 低位准备"""

@@ -2,7 +2,13 @@ from .common.print import print_node
 from .common.delay import delay
 from .base_align_to_apriltag import BaseAlignToAprilTag
 from .base import BaseMove, BaseRotate, BaseStop, BaseRotateByAngle
-from .arm import ArmReset, ArmPrepare, ArmGrasp, ArmLoad, ArmGraspAndLoad
+from .arm import (
+    ArmReset,
+    ArmResetToLowPrepare, ArmLowPrepareToLowGrip, ArmLowGripToResetGripping,
+    ArmResetToHighPrepare, ArmHighPrepareToHighGrip, ArmHighGripToResetGripping,
+    ArmResetGrippingToStore, ArmResetGrippingToShot, ArmStoreToResetGripping,
+    ArmStoreToReset, ArmShotToReset
+)
 from .fire_once import FireOnce
 from .common.system_cleanup import SystemCleanup
 from .common.system_init import SystemInit
@@ -23,10 +29,17 @@ _TASK_NODE_CLASSES = {
     'base_stop': BaseStop,
     'base_rotate_by_angle': BaseRotateByAngle,
     'arm_reset': ArmReset,
-    'arm_prepare': ArmPrepare,
-    'arm_grasp': ArmGrasp,
-    'arm_load': ArmLoad,
-    'arm_grasp_and_load': ArmGraspAndLoad,
+    'arm_reset_to_low_prepare': ArmResetToLowPrepare,
+    'arm_low_prepare_to_low_grip': ArmLowPrepareToLowGrip,
+    'arm_low_grip_to_reset_gripping': ArmLowGripToResetGripping,
+    'arm_reset_to_high_prepare': ArmResetToHighPrepare,
+    'arm_high_prepare_to_high_grip': ArmHighPrepareToHighGrip,
+    'arm_high_grip_to_reset_gripping': ArmHighGripToResetGripping,
+    'arm_reset_gripping_to_store': ArmResetGrippingToStore,
+    'arm_reset_gripping_to_shot': ArmResetGrippingToShot,
+    'arm_store_to_reset_gripping': ArmStoreToResetGripping,
+    'arm_store_to_reset': ArmStoreToReset,
+    'arm_shot_to_reset': ArmShotToReset,
     'fire_control': FireOnce,
     'system_cleanup': SystemCleanup,
     'system_init': SystemInit,

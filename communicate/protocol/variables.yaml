@@ -55,45 +55,34 @@ variables:
     vtype: BOOL
 
   # --- 机械臂相关 ---
-  - name: arm_reset                       # 上电进入复位
+  - name: arm_high_grip_to_shot
     vtype: BOOL
-
-  - name: arm_reset_to_low_prepare        # 复位 -> 低位准备
+  - name: arm_high_grip_to_store
     vtype: BOOL
-
-  - name: arm_low_prepare_to_low_grip     # 低位准备 -> 低位夹取
+  - name: arm_high_prepare_to_grip
     vtype: BOOL
-
-  - name: arm_low_grip_to_reset_gripping  # 低位夹取 -> 抓取复位
+  - name: arm_high_grip_to_wait_shot
     vtype: BOOL
-
-  - name: arm_reset_to_high_prepare       # 复位 -> 高位准备
+  - name: arm_low_grip_to_shot
     vtype: BOOL
-
-  - name: arm_high_prepare_to_high_grip   # 高位准备 -> 高位夹取
+  - name: arm_low_grip_to_store
     vtype: BOOL
-
-  - name: arm_high_grip_to_reset_gripping # 高位夹取 -> 抓取复位
+  - name: arm_low_prepare_to_grip
     vtype: BOOL
-
-  - name: arm_reset_gripping_to_store     # 抓取复位 -> 存储
+  - name: arm_low_grip_to_wait_shot
     vtype: BOOL
-
-  - name: arm_reset_gripping_to_shot      # 抓取复位 -> 射击
+  - name: arm_reset_to_high_prepare
     vtype: BOOL
-
-  - name: arm_store_to_reset_gripping     # 存储 -> 抓取复位
+  - name: arm_reset_to_store
     vtype: BOOL
-
-  - name: arm_store_to_reset              # 存储 -> 复位（返回初始状态）
+  - name: arm_shot_to_reset
     vtype: BOOL
-
-  - name: arm_reset_to_store         # 复位 -> 存储
+  - name: arm_store_to_reset
     vtype: BOOL
-
-  - name: arm_shot_to_reset               # 射击 -> 复位（返回初始状态）
+  - name: arm_store_to_shot
     vtype: BOOL
-
+  - name: arm_wait_shot_to_shot
+    vtype: BOOL
 
   - name: arm_relax        # 机械臂掉电
     vtype: BOOL

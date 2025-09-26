@@ -126,50 +126,25 @@ def arm_reset_to_store():
     send_kv({Var.ARM_RESET_TO_STORE: True})
     wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_STORE), 10)
 
-def arm_reset_to_low_prepare():
-    """复位 -> 低位准备"""
-    send_kv({Var.ARM_RESET_TO_LOW_PREPARE: True})
-    wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_LOW_PREPARE), 10)
-
-def arm_low_prepare_to_low_grip():
-    """低位准备 -> 低位夹取"""
-    send_kv({Var.ARM_LOW_PREPARE_TO_LOW_GRIP: True})
-    wait_for_ack(Var.OK, int(Var.ARM_LOW_PREPARE_TO_LOW_GRIP), 10)
-
-def arm_low_grip_to_reset_gripping():
-    """低位夹取 -> 抓取复位"""
-    send_kv({Var.ARM_LOW_GRIP_TO_RESET_GRIPPING: True})
-    wait_for_ack(Var.OK, int(Var.ARM_LOW_GRIP_TO_RESET_GRIPPING), 10)
+def arm_low_prepare_to_grip():
+    """低位准备 -> 夹取"""
+    send_kv({Var.ARM_LOW_PREPARE_TO_GRIP: True})
+    wait_for_ack(Var.OK, int(Var.ARM_LOW_PREPARE_TO_GRIP), 10)
 
 def arm_reset_to_high_prepare():
     """复位 -> 高位准备"""
     send_kv({Var.ARM_RESET_TO_HIGH_PREPARE: True})
     wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_HIGH_PREPARE), 10)
+    
+def arm_reset_to_low_prepare():
+    """复位 -> 低位准备"""
+    send_kv({Var.ARM_RESET_TO_LOW_PREPARE: True})
+    wait_for_ack(Var.OK, int(Var.ARM_RESET_TO_LOW_PREPARE), 10)
 
-def arm_high_prepare_to_high_grip():
-    """高位准备 -> 高位夹取"""
-    send_kv({Var.ARM_HIGH_PREPARE_TO_HIGH_GRIP: True})
-    wait_for_ack(Var.OK, int(Var.ARM_HIGH_PREPARE_TO_HIGH_GRIP), 10)
-
-def arm_high_grip_to_reset_gripping():
-    """高位夹取 -> 抓取复位"""
-    send_kv({Var.ARM_HIGH_GRIP_TO_RESET_GRIPPING: True})
-    wait_for_ack(Var.OK, int(Var.ARM_HIGH_GRIP_TO_RESET_GRIPPING), 10)
-
-def arm_reset_gripping_to_store():
-    """抓取复位 -> 存储"""
-    send_kv({Var.ARM_RESET_GRIPPING_TO_STORE: True})
-    wait_for_ack(Var.OK, int(Var.ARM_RESET_GRIPPING_TO_STORE), 10)
-
-def arm_reset_gripping_to_shot():
-    """抓取复位 -> 射击"""
-    send_kv({Var.ARM_RESET_GRIPPING_TO_SHOT: True})
-    wait_for_ack(Var.OK, int(Var.ARM_RESET_GRIPPING_TO_SHOT), 10)
-
-def arm_store_to_reset_gripping():
-    """存储 -> 抓取复位"""
-    send_kv({Var.ARM_STORE_TO_RESET_GRIPPING: True})
-    wait_for_ack(Var.OK, int(Var.ARM_STORE_TO_RESET_GRIPPING), 10)
+def arm_high_prepare_to_grip():
+    """高位准备 -> 夹取"""
+    send_kv({Var.ARM_HIGH_PREPARE_TO_GRIP: True})
+    wait_for_ack(Var.OK, int(Var.ARM_HIGH_PREPARE_TO_GRIP), 10)
 
 def arm_store_to_reset():
     """存储 -> 复位（返回初始状态）"""
@@ -181,10 +156,45 @@ def arm_shot_to_reset():
     send_kv({Var.ARM_SHOT_TO_RESET: True})
     wait_for_ack(Var.OK, int(Var.ARM_SHOT_TO_RESET), 10)
 
-def arm_relax():
-    """机械臂放松"""
-    send_kv({Var.ARM_RELAX: True})
-    wait_for_ack(Var.OK, int(Var.ARM_RELAX), 10)
+def arm_high_grip_to_shot():
+    """高位夹取 -> 射击"""
+    send_kv({Var.ARM_HIGH_GRIP_TO_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_HIGH_GRIP_TO_SHOT), 10)
+
+def arm_store_to_shot():
+    """存储 -> 射击"""
+    send_kv({Var.ARM_STORE_TO_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_STORE_TO_SHOT), 10)
+
+def arm_low_grip_to_wait_shot():
+    """低位夹取 -> 等待射击"""
+    send_kv({Var.ARM_LOW_GRIP_TO_WAIT_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_LOW_GRIP_TO_WAIT_SHOT), 10)
+
+def arm_high_grip_to_wait_shot():
+    """高位夹取 -> 等待射击"""
+    send_kv({Var.ARM_HIGH_GRIP_TO_WAIT_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_HIGH_GRIP_TO_WAIT_SHOT), 10)
+
+def arm_wait_shot_to_shot():
+    """等待射击 -> 射击"""
+    send_kv({Var.ARM_WAIT_SHOT_TO_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_WAIT_SHOT_TO_SHOT), 10)
+
+def arm_high_grip_to_store():
+    """高位夹取 -> 存储"""
+    send_kv({Var.ARM_HIGH_GRIP_TO_STORE: True})
+    wait_for_ack(Var.OK, int(Var.ARM_HIGH_GRIP_TO_STORE), 10)
+
+def arm_low_grip_to_store():
+    """低位夹取 -> 存储"""
+    send_kv({Var.ARM_LOW_GRIP_TO_STORE: True})
+    wait_for_ack(Var.OK, int(Var.ARM_LOW_GRIP_TO_STORE), 10)
+
+def arm_low_grip_to_shot():
+    """低位夹取 -> 射击"""
+    send_kv({Var.ARM_LOW_GRIP_TO_SHOT: True})
+    wait_for_ack(Var.OK, int(Var.ARM_LOW_GRIP_TO_SHOT), 10)
     
 def set_fire_speed(speed: float):
     send_kv({Var.FRICTION_WHEEL_SPEED: speed})

@@ -2,5 +2,6 @@ from .base_move import BaseMove
 from .base_rotate import BaseRotate
 from .base_stop import BaseStop
 from .base_rotate_by_angle import BaseRotateByAngle
+from .base_move_fast_ex import BaseMoveFastEx
 
-__all__ = ['BaseMove', 'BaseRotate', 'BaseStop', 'BaseRotateByAngle']
+__all__ = ['BaseMove', 'BaseRotate', 'BaseStop', 'BaseRotateByAngle', 'BaseMoveFastEx']

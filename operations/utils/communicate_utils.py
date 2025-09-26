@@ -193,6 +193,25 @@ def fire_once():
     send_kv({Var.FIRE_ONCE:True})
     wait_for_ack(Var.OK, int(Var.FIRE_ONCE), 30)
 
+def dart_push_once():
+    """推进飞镖向前，然后回到原位"""
+    send_kv({Var.DART_PUSH_ONCE: True})
+    wait_for_ack(Var.OK, int(Var.DART_PUSH_ONCE), 10)
+
+def set_friction_wheel_speed(speed: float):
+    """设置摩擦轮速度"""
+    send_kv({Var.FRICTION_WHEEL_SPEED: speed})
+
+def friction_wheel_start():
+    """启动摩擦轮"""
+    send_kv({Var.FRICTION_WHEEL_START: True})
+    wait_for_ack(Var.OK, int(Var.FRICTION_WHEEL_START), 10)
+
+def friction_wheel_stop():
+    """停止摩擦轮"""
+    send_kv({Var.FRICTION_WHEEL_STOP: True})
+    wait_for_ack(Var.OK, int(Var.FRICTION_WHEEL_STOP), 10)
+
 # --- 炮台相关 ---
 def turret_set_yaw(angle: float):
     # 确保角度在有效范围内

@@ -15,6 +15,10 @@ from .common.system_cleanup import SystemCleanup
 from .common.system_init import SystemInit
 from .turret.turret_align_to_light import TurretAlignToLight
 from .turret.turret_set_yaw import TurretSetYaw
+from .turret.dart_push_once import DartPushOnce
+from .turret.set_friction_wheel_speed import SetFrictionWheelSpeed
+from .turret.friction_wheel_start import FrictionWheelStart
+from .turret.friction_wheel_stop import FrictionWheelStop
 from .common.counter_increment import CounterIncrement
 from .common.counter_decrement import CounterDecrement
 from .common.counter_set import CounterSet
@@ -47,11 +51,15 @@ _TASK_NODE_CLASSES = {
     'arm_store_dart': ArmStoreDart,
     'arm_shoot_dart': ArmShootDart,
     'arm_load_stored_dart': ArmLoadStoredDart,
-    'fire_control': FireOnce,
+    'fire_once': FireOnce,
     'system_cleanup': SystemCleanup,
     'system_init': SystemInit,
     'turret_align_to_light': TurretAlignToLight,
     'turret_set_yaw': TurretSetYaw,
+    'dart_push_once': DartPushOnce,
+    'set_friction_wheel_speed': SetFrictionWheelSpeed,
+    'friction_wheel_start': FrictionWheelStart,
+    'friction_wheel_stop': FrictionWheelStop,
     'counter_increment': CounterIncrement,
     'counter_decrement': CounterDecrement,
     'counter_set': CounterSet,

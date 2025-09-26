@@ -1,5 +1,5 @@
 # Auto-generated. DO NOT EDIT MANUALLY.
-# Generated at UTC 2025-09-26 09:29:05
+# Generated at UTC 2025-09-26 09:52:32
 # Version policy:
 #   PROTOCOL_DATA_VER_FULL = YYYYMMDDHHMMSS (UTC)
 #   PROTOCOL_DATA_VER      = PROTOCOL_DATA_VER_FULL & 0xFF  # 1-byte for DATA header
@@ -7,8 +7,8 @@
 from enum import IntEnum
 from typing import Dict, Optional, TypedDict
 
-PROTOCOL_DATA_VER_FULL: int = 20250926092905
-PROTOCOL_DATA_VER: int = 0x69
+PROTOCOL_DATA_VER_FULL: int = 20250926095232
+PROTOCOL_DATA_VER: int = 0x80
 
 class Msg(IntEnum):
     PC_TO_MCU = 0x01
@@ -26,6 +26,7 @@ class Var(IntEnum):
     BASE_ROTATE_CW_FAST = 0x36  # BOOL
     ARM_STORE_TO_SHOT = 0x37  # BOOL
     FIRE_ONCE = 0x41  # BOOL
+    ARM_RESET = 0x4B  # BOOL
     ARM_LOW_GRIP_TO_WAIT_SHOT = 0x4C  # BOOL
     ARM_LOW_PREPARE_TO_GRIP = 0x53  # BOOL
     BASE_MOVE_FORWARD_FAST = 0x5B  # BOOL
@@ -56,6 +57,7 @@ class Var(IntEnum):
     DART_PUSH_ONCE = 0xCD  # BOOL
     HEARTBEAT = 0xD1  # U8
     ARM_LOW_GRIP_TO_SHOT = 0xD6  # BOOL
+    ARM_RESET_TO_LOW_PREPARE = 0xD8  # BOOL
     FRICTION_WHEEL_START = 0xDE  # BOOL
     TURRET_ANGLE_YAW = 0xE1  # F32
     TEST_VAR_U16 = 0xE6  # U16
@@ -78,6 +80,7 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.BASE_ROTATE_CW_FAST): {"key": "base_rotate_CW_fast", "vtype": "BOOL", "size": 1},
     int(Var.ARM_STORE_TO_SHOT): {"key": "arm_store_to_shot", "vtype": "BOOL", "size": 1},
     int(Var.FIRE_ONCE): {"key": "fire_once", "vtype": "BOOL", "size": 1},
+    int(Var.ARM_RESET): {"key": "arm_reset", "vtype": "BOOL", "size": 1},
     int(Var.ARM_LOW_GRIP_TO_WAIT_SHOT): {"key": "arm_low_grip_to_wait_shot", "vtype": "BOOL", "size": 1},
     int(Var.ARM_LOW_PREPARE_TO_GRIP): {"key": "arm_low_prepare_to_grip", "vtype": "BOOL", "size": 1},
     int(Var.BASE_MOVE_FORWARD_FAST): {"key": "base_move_forward_fast", "vtype": "BOOL", "size": 1},
@@ -108,6 +111,7 @@ VAR_META: Dict[int, VarMeta] = {
     int(Var.DART_PUSH_ONCE): {"key": "dart_push_once", "vtype": "BOOL", "size": 1},
     int(Var.HEARTBEAT): {"key": "HEARTBEAT", "vtype": "U8", "size": 1},
     int(Var.ARM_LOW_GRIP_TO_SHOT): {"key": "arm_low_grip_to_shot", "vtype": "BOOL", "size": 1},
+    int(Var.ARM_RESET_TO_LOW_PREPARE): {"key": "arm_reset_to_low_prepare", "vtype": "BOOL", "size": 1},
     int(Var.FRICTION_WHEEL_START): {"key": "friction_wheel_start", "vtype": "BOOL", "size": 1},
     int(Var.TURRET_ANGLE_YAW): {"key": "turret_angle_yaw", "vtype": "F32", "size": 4},
     int(Var.TEST_VAR_U16): {"key": "test_var_u16", "vtype": "U16", "size": 2},
@@ -126,6 +130,7 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.BASE_ROTATE_CW_FAST): 1,
     int(Var.ARM_STORE_TO_SHOT): 1,
     int(Var.FIRE_ONCE): 1,
+    int(Var.ARM_RESET): 1,
     int(Var.ARM_LOW_GRIP_TO_WAIT_SHOT): 1,
     int(Var.ARM_LOW_PREPARE_TO_GRIP): 1,
     int(Var.BASE_MOVE_FORWARD_FAST): 1,
@@ -156,6 +161,7 @@ VAR_FIXED_SIZE: Dict[int, int] = {
     int(Var.DART_PUSH_ONCE): 1,
     int(Var.HEARTBEAT): 1,
     int(Var.ARM_LOW_GRIP_TO_SHOT): 1,
+    int(Var.ARM_RESET_TO_LOW_PREPARE): 1,
     int(Var.FRICTION_WHEEL_START): 1,
     int(Var.TURRET_ANGLE_YAW): 4,
     int(Var.TEST_VAR_U16): 2,

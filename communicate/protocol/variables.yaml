@@ -55,11 +55,15 @@ variables:
     vtype: BOOL
 
   # --- 机械臂相关 ---
+  - name: arm_reset
+    vtype: BOOL
   - name: arm_high_grip_to_shot
     vtype: BOOL
   - name: arm_high_grip_to_store
     vtype: BOOL
   - name: arm_high_prepare_to_grip
+    vtype: BOOL
+  - name: arm_reset_to_high_prepare
     vtype: BOOL
   - name: arm_high_grip_to_wait_shot
     vtype: BOOL
@@ -71,7 +75,7 @@ variables:
     vtype: BOOL
   - name: arm_low_grip_to_wait_shot
     vtype: BOOL
-  - name: arm_reset_to_high_prepare
+  - name: arm_reset_to_low_prepare
     vtype: BOOL
   - name: arm_reset_to_store
     vtype: BOOL

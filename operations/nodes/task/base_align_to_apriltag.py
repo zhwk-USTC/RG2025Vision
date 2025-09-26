@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from ...utils.base_alignment_utils import base_align_to_apriltag, DEFAULT_TOLERANCE_XY, DEFAULT_TOLERANCE_YAW
 
 class BaseAlignToAprilTag:
@@ -7,7 +7,7 @@ class BaseAlignToAprilTag:
     def __init__(self, 
                  cam_key: str = 'left', 
                  tag_families: str = 'tag36h11',
-                 tag_id: Optional[int] = None, 
+                 tag_ids: Optional[List[int]] = None,
                  tag_size: float = 0.12,
                  target_z: float = -1.0, 
                  target_x: float = 0.0,
@@ -16,13 +16,18 @@ class BaseAlignToAprilTag:
                  tolerance_z: float = DEFAULT_TOLERANCE_XY,
                  tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
                  ):
-        # 确保 tag_id 是 int 类型
-        if tag_id is not None:
-            tag_id = int(tag_id)
-        
+        # 归一化：确保 tag_ids 是 List[int] 或 None
+        if tag_ids is not None:
+            try:
+                tag_ids = [int(x) for x in tag_ids]
+                if len(tag_ids) == 0:
+                    tag_ids = None
+            except Exception:
+                tag_ids = None
+
         self.cam_key = cam_key
         self.tag_families = tag_families
-        self.tag_id = tag_id
+        self.tag_ids = tag_ids
         self.tag_size = tag_size
         self.target_x = target_x
         self.target_z = target_z
@@ -35,7 +40,7 @@ class BaseAlignToAprilTag:
         return base_align_to_apriltag(
             cam_key=self.cam_key,  # type: ignore
             target_tag_families=self.tag_families,
-            target_tag_id=self.tag_id,
+            target_tag_ids=self.tag_ids,
             target_tag_size=self.tag_size,
             target_z=self.target_z,
             target_x=self.target_x,

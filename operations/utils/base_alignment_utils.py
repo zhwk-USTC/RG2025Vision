@@ -3,7 +3,7 @@
 包含各个步骤中经常复用的代码，如位姿定位、对齐控制等
 """
 
-from typing import Optional, Tuple, Literal
+from typing import Optional, Tuple, Literal, List
 import time
 from vision import CAM_KEY_TYPE
 from core.logger import logger
@@ -169,7 +169,7 @@ class AlignmentUtils:
     def apriltag_alignment_loop(
         cam_key: CAM_KEY_TYPE,
         target_tag_families: str,
-        target_tag_id: Optional[int],
+        target_tag_ids: Optional[List[int]],      # 改：使用列表
         target_tag_size: Optional[float],
         target_z: float,
         debug_prefix: str,
@@ -181,25 +181,30 @@ class AlignmentUtils:
         tolerance_z: float = DEFAULT_TOLERANCE_XY,
         tolerance_yaw: float = DEFAULT_TOLERANCE_YAW,
         max_retries: int = 20
-        
     ) -> bool:
-        # 确保 target_tag_id 是 int 类型
-        if target_tag_id is not None:
-            target_tag_id = int(target_tag_id)
-        
+        # 归一化：确保是 List[int]；空列表按 None 处理
+        ids_norm: Optional[List[int]] = None
+        if target_tag_ids is not None:
+            try:
+                ids_norm = [int(x) for x in target_tag_ids]
+                if len(ids_norm) == 0:
+                    ids_norm = None
+            except Exception:
+                ids_norm = None  # 非法内容时视为未指定
+
         if not VisionUtils.check_vision_system(f'{debug_prefix}_error'):
             return False
 
         while True:
             det, pose = VisionUtils.detect_apriltag_with_retry(
-                cam_key, 
-                target_tag_families,
-                target_tag_id, 
-                target_tag_size,
-                max_retries, 
-                0.05, 
-                debug_prefix, 
-                task_name
+                cam_key=cam_key,
+                target_tag_families=target_tag_families,
+                target_tag_ids=ids_norm,                 # 改：传入列表
+                target_tag_size=target_tag_size,
+                max_retries=max_retries,
+                retry_delay=0.05,
+                debug_prefix=debug_prefix,
+                debug_description=task_name
             )
             if pose is None:
                 MovementUtils.stop_movement()
@@ -208,8 +213,8 @@ class AlignmentUtils:
             e_x, e_y, e_yaw = AlignmentUtils.calculate_position_error(
                 pose, target_z, target_x, target_yaw
             )
-            
-            # 添加详细的调试信息，包括原始pose值
+
+            # 调试：记录 pose 与误差
             yaw_source = 'pitch' if hasattr(pose, 'pitch') and pose.pitch is not None else 'yaw'
             set_debug_var(
                 f'{debug_prefix}_pose_raw',
@@ -255,7 +260,7 @@ class AlignmentUtils:
 def base_align_to_apriltag(
     cam_key: CAM_KEY_TYPE, 
     target_tag_families: str,
-    target_tag_id: Optional[int], 
+    target_tag_ids: Optional[List[int]], 
     target_tag_size: float,
     target_z: float,
     target_x: float = 0.0,
@@ -265,32 +270,15 @@ def base_align_to_apriltag(
     tolerance_yaw: float = DEFAULT_TOLERANCE_YAW
 ) -> bool:
     """
-    基于AprilTag的底盘对齐函数
-    
-    轴方向说明（相机坐标系）：
-    - X轴：左右方向（左正右负）
-    - Y轴：上下方向（上正下负，本函数中不使用）
-    - Z轴：前后方向（远正近负）
-    - Yaw：平面旋转角度（逆时针正，顺时针负）
-    
-    参数说明：
-    - target_x: 目标X轴位置（左右偏移）
-    - target_z: 目标Z轴位置（前后距离）
-    - target_yaw: 目标Yaw角度（平面朝向）
-    - tolerance_x: X轴允许误差（左右容差）
-    - tolerance_z: Z轴允许误差（前后容差）
-    - tolerance_yaw: Yaw角度允许误差
+    基于AprilTag的底盘对齐函数（支持多个 ID）
     """
-    # 确保 target_tag_id 是 int 类型
-    if target_tag_id is not None:
-        target_tag_id = int(target_tag_id)
-    
+    # 直接把列表传给 alignment_loop；归一化逻辑在内部完成
     return AlignmentUtils.apriltag_alignment_loop(
-        cam_key, 
-        target_tag_families,
-        target_tag_id, 
-        target_tag_size,
-        target_z, 
+        cam_key=cam_key, 
+        target_tag_families=target_tag_families,
+        target_tag_ids=target_tag_ids,
+        target_tag_size=target_tag_size,
+        target_z=target_z, 
         debug_prefix="tag_align",
         task_name="TagAlign",
         target_x=target_x,

@@ -60,17 +60,27 @@ class VisionUtils:
     def detect_apriltag_with_retry(
         cam_key: CAM_KEY_TYPE,
         target_tag_families: str,
-        target_tag_id: Optional[int] = None,
+        target_tag_ids: Optional[List[int]] = None,
         target_tag_size: Optional[float] = None,
         max_retries: int = 20,
         retry_delay: float = 0.05,
         debug_prefix: str = "tag",
         debug_description: str = "标签检测"
     ):
+        """
+        在相机画面中检测 AprilTag，并（可选）按给定 ID 或 ID 列表进行筛选；
+        若提供多个 ID，将在这些 ID 中选择“最接近图像中心列”的那个返回。
+
+        Args:
+            target_tag_id: 兼容旧参数，单个 ID
+            target_tag_ids: 新参数，多个 ID
+        """
         vs = get_vision()
         if not vs:
             set_debug_var(f'{debug_prefix}_error', 'vision not ready', DebugLevel.ERROR, DebugCategory.ERROR, "视觉系统未准备就绪")
             return None, None
+
+        id_set = target_tag_ids
 
         iter_cnt = 0
         while iter_cnt <= max_retries:
@@ -84,57 +94,70 @@ class VisionUtils:
                 return None, None
 
             intr = vs.get_camera_intrinsics(cam_key)
-            if(target_tag_families == 'tag36h11'):
+            if target_tag_families == 'tag36h11':
                 dets = vs.detect_tag36h11(frame, intr, target_tag_size)
             elif target_tag_families == 'tag25h9':
                 dets = vs.detect_tag25h9(frame, intr, target_tag_size)
             else:
                 set_debug_var(f'{debug_prefix}_error', 'unknown tag family', DebugLevel.ERROR, DebugCategory.ERROR, f"未知的标签族: {target_tag_families}")
                 return None, None
-            set_debug_var(f'{debug_prefix}_detections', len(dets) if dets else 0,
-                          DebugLevel.INFO, DebugCategory.DETECTION, f"检测到的{debug_description}数量")
+
+            set_debug_var(
+                f'{debug_prefix}_detections',
+                len(dets) if dets else 0,
+                DebugLevel.INFO,
+                DebugCategory.DETECTION,
+                f"检测到的{debug_description}数量"
+            )
 
             if not dets:
                 if iter_cnt >= max_retries:
                     logger.error(f"[{debug_description}] 未检测到标签")
-                    set_debug_var(f'{debug_prefix}_error', 'no tag found',
-                                  DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{debug_description}")
+                    set_debug_var(f'{debug_prefix}_error', 'no tag found', DebugLevel.ERROR, DebugCategory.DETECTION, f"未检测到{debug_description}")
                     return None, None
                 iter_cnt += 1
                 time.sleep(retry_delay)
                 continue
 
-            # 选择目标标签：选择与上一个返回值距离最近的满足条件的标签
-            if target_tag_id is None:
-                # 未指定ID时，选择所有检测到的标签
+            # --- ID 筛选（None 表示不筛选）---
+            if id_set is None or not id_set:
                 candidate_dets = dets
             else:
-                # 指定了ID时，选择匹配ID的标签
-                candidate_dets = [d for d in dets if getattr(d, 'tag_id', None) == target_tag_id]
+                candidate_dets = [d for d in dets if getattr(d, 'tag_id', None) in id_set]
+
                 if not candidate_dets:
                     if iter_cnt >= max_retries:
-                        logger.error(f"[{debug_description}] 未找到指定ID={target_tag_id}的标签")
-                        set_debug_var(f'{debug_prefix}_error', f'target tag {target_tag_id} not found',
-                                      DebugLevel.ERROR, DebugCategory.DETECTION, f"未找到指定{debug_description}ID={target_tag_id}")
+                        ids_msg = (list(id_set) if id_set else [])
+                        logger.error(f"[{debug_description}] 未找到指定ID={ids_msg}的标签")
+                        set_debug_var(
+                            f'{debug_prefix}_error',
+                            f'target tag(s) {ids_msg} not found',
+                            DebugLevel.ERROR,
+                            DebugCategory.DETECTION,
+                            f"未找到指定{debug_description}ID={ids_msg}"
+                        )
                         return None, None
                     iter_cnt += 1
                     time.sleep(retry_delay)
                     continue
 
-            # 从候选标签中选择一个
-            # 仅选择最靠近中间列的标签
+            # 仅选择最靠近图像中心列的那个
             height, width = frame.shape[:2]
             center_x = width / 2
             det = min(candidate_dets, key=lambda d: abs(getattr(d, 'center', [center_x, 0])[0] - center_x))
 
-            set_debug_var(f'{debug_prefix}_tag_id', getattr(det, 'tag_id', None),
-                          DebugLevel.INFO, DebugCategory.DETECTION, f"当前检测到的{debug_description}ID")
+            set_debug_var(
+                f'{debug_prefix}_tag_id',
+                getattr(det, 'tag_id', None),
+                DebugLevel.INFO,
+                DebugCategory.DETECTION,
+                f"当前检测到的{debug_description}ID"
+            )
 
             pose = vs.locate_from_tag(det)
             if pose is None:
                 logger.error(f"[{debug_description}] 无法从标签中定位")
-                set_debug_var(f'{debug_prefix}_error', 'pose none',
-                              DebugLevel.ERROR, DebugCategory.POSITION, "无法从标签获取位姿信息")
+                set_debug_var(f'{debug_prefix}_error', 'pose none', DebugLevel.ERROR, DebugCategory.POSITION, "无法从标签获取位姿信息")
                 return None, None
 
             return det, pose

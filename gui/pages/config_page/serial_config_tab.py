@@ -49,7 +49,6 @@ def render_serial_config_tab() -> None:
                 # 延迟一点时间让用户看到提示，然后刷新页面
                 ui.timer(1.0, lambda: ui.navigate.reload(), once=True)
             except Exception as e:
-                ui.notify(f'串口扫描失败: {e}', type='negative')
                 logger.error(f'串口扫描失败: {e}')
         scan_serial_button = ui.button(
             '扫描串口', color='primary', on_click=on_scan_serial_ports)

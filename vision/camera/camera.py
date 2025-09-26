@@ -31,7 +31,6 @@ class CameraConfig:
     wb_temperature: Optional[int] = None       # 色温（K）
 
 
-
 class Camera:
     """
     设备层相机：负责连接、采帧与基本参数维护。
@@ -48,7 +47,7 @@ class Camera:
         self.height: Optional[int] = None
         self.fps: Optional[float] = None       # 实际值在 connect 后回读覆盖
 
-        # 新增：保存完整配置以用于应用专业参数
+        # 保存完整配置以用于应用专业参数
         self._config: CameraConfig = config if config else CameraConfig()
 
         if config:
@@ -81,7 +80,7 @@ class Camera:
     def is_open(self) -> bool:
         return bool(self.connected and self.cap is not None and self.cap.isOpened())
 
-    # --------- 新增：通用安全设置函数 ---------
+    # --------- 通用安全设置函数 ---------
     def _try_set(self, prop: int, value: float | int, name: str) -> bool:
         """set -> get 回读校验并记录日志"""
         assert self.cap is not None
@@ -102,28 +101,141 @@ class Camera:
                 return True
         return False
 
+    def _supports(self, prop: int) -> bool:
+        """探测某属性是否可用"""
+        if self.cap is None:
+            return False
+        try:
+            v = self.cap.get(prop)
+            if v != -1 and not math.isnan(v):
+                return True
+        except Exception:
+            pass
+        try:
+            ok = self.cap.set(prop, 0.0)
+            v2 = self.cap.get(prop)
+            return bool(ok and v2 != -1 and not math.isnan(v2))
+        except Exception:
+            return False
+
+    # -------------------------- 曝光 --------------------------
+
     def _set_exposure_smart(self) -> None:
         """
         曝光的跨平台设置：
         - 若提供 exposure（原始值），直接写入 CAP_PROP_EXPOSURE。
         """
+        AE = getattr(cv2, "CAP_PROP_AUTO_EXPOSURE", 21)
+
         if self._config.auto_exposure_off:
             # 不同后端语义各异：0/1 或 0.25/0.75；这里都试一下“关闭自动”
-            self._try_set_multi(cv2.CAP_PROP_AUTO_EXPOSURE, [0, 0.25, 1], "AUTO_EXPOSURE(尝试关闭)")
+            self._try_set_multi(AE, [0, 0.25, 1], "AUTO_EXPOSURE(尝试关闭)")
 
         # 直接设原始曝光值
         if self._config.exposure is not None:
-            self._try_set(cv2.CAP_PROP_EXPOSURE, self._config.exposure, "EXPOSURE(raw)")
+            self._try_set(getattr(cv2, "CAP_PROP_EXPOSURE", 15), self._config.exposure, "EXPOSURE(raw)")
 
-        
         # 如果没有设置任何手动曝光参数且未明确关闭自动曝光，则恢复自动曝光
-        if (not self._config.auto_exposure_off and 
+        if (not self._config.auto_exposure_off and
             self._config.exposure is None):
             # 不同后端语义各异：0.75/1 或其他值表示"开启自动"
-            self._try_set_multi(cv2.CAP_PROP_AUTO_EXPOSURE, [0.75, 1, 3], "AUTO_EXPOSURE(恢复自动)")
+            self._try_set_multi(AE, [0.75, 1, 3], "AUTO_EXPOSURE(恢复自动)")
 
         if self._config.gain is not None:
-            self._try_set(cv2.CAP_PROP_GAIN, self._config.gain, "GAIN")
+            self._try_set(getattr(cv2, "CAP_PROP_GAIN", 14), self._config.gain, "GAIN")
+
+    # -------------------------- 白平衡 --------------------------
+
+    def _k_to_blue_red(self, k: int, lo: int = 0, hi: int = 4096) -> tuple[int, int]:
+        """
+        将色温(K)近似映射为 BLUE_U / RED_V 的寄存器值（简单线性映射，不做自动求增益）。
+        设定：
+          - 3000K 近似为暖光：RED_V 高、BLUE_U 低
+          - 6500K 近似为日光：BLUE_U 高、RED_V 适中
+        """
+        k = max(3000, min(6500, int(k)))
+        # 归一化到 [0,1]
+        t = (k - 3000) / (6500 - 3000)
+
+        # 设 BLUE_U: 3000K -> 0.40, 6500K -> 0.65
+        #    RED_V : 3000K -> 0.70, 6500K -> 0.55
+        blue_norm = 0.40 + (0.65 - 0.40) * t
+        red_norm  = 0.70 + (0.55 - 0.70) * t
+
+        blue = int(lo + blue_norm * (hi - lo))
+        red  = int(lo + red_norm  * (hi - lo))
+        return blue, red
+
+    def _set_white_balance_smart(self) -> None:
+        """
+        白平衡的跨平台设置（无自动求增益版）：
+        - 若关闭自动白平衡，优先尝试设置 Kelvin 色温；
+        - 若设备不支持 Kelvin，则回退到 BLUE_U/RED_V 的固定映射；
+        - 若既未提供色温又关闭了自动，则把 BLUE_U/RED_V 设为中性基准。
+        """
+        assert self.cap is not None
+
+        # 常量（用 getattr 兼容旧版本）
+        AUTO_WB   = getattr(cv2, "CAP_PROP_AUTO_WB", 44)
+        WB_TEMP   = getattr(cv2, "CAP_PROP_WB_TEMPERATURE", 45)
+        WB_BLUE_U = getattr(cv2, "CAP_PROP_WHITE_BALANCE_BLUE_U", 17)
+        WB_RED_V  = getattr(cv2, "CAP_PROP_WHITE_BALANCE_RED_V", 28)
+
+        def _sleep_short(sec: float = 0.1):
+            try:
+                time.sleep(sec)
+            except Exception:
+                pass
+
+        # 1) 如请求手动，先尝试关闭自动WB
+        if self._config.auto_wb_off:
+            self._try_set_multi(AUTO_WB, [0, 0.0], "AUTO_WB(尝试关闭)")
+            _sleep_short(0.12)  # 给驱动切换时间
+
+        # 2) 优先尝试 Kelvin 色温
+        wrote_any = False
+        has_wbt = self._supports(WB_TEMP)
+        if self._config.wb_temperature is not None and has_wbt:
+            target_k = int(self._config.wb_temperature)
+            target_k = max(2800, min(6500, target_k))  # 保守夹取
+            if self._try_set(WB_TEMP, target_k, "WB_TEMPERATURE"):
+                _sleep_short(0.05)
+                wrote_any = True
+
+        # 3) Kelvin 不可用时的兜底：BLUE_U / RED_V 固定映射（不做自动求增益）
+        if not wrote_any and self._config.auto_wb_off:
+            has_blue = self._supports(WB_BLUE_U)
+            has_red  = self._supports(WB_RED_V)
+
+            if has_blue or has_red:
+                # 若提供色温，则用映射；否则给中性基准（0.5区间）
+                lo, hi = 0, 4096
+                if self._config.wb_temperature is not None:
+                    blue_val, red_val = self._k_to_blue_red(self._config.wb_temperature, lo, hi)
+                else:
+                    blue_val = (lo + hi) // 2
+                    red_val  = (lo + hi) // 2
+
+                if has_blue: self._try_set(WB_BLUE_U, blue_val, "WB_BLUE_U(兜底)")
+                if has_red:  self._try_set(WB_RED_V,  red_val,  "WB_RED_V(兜底)")
+                _sleep_short(0.05)
+                wrote_any = True
+            else:
+                logger.debug("WB兜底不可用：设备不支持 WB_BLUE_U/RED_V")
+
+        # 4) 若既没请求手动也未指定色温 → 恢复自动（有能力时）
+        if (not self._config.auto_wb_off and
+            self._config.wb_temperature is None and
+            self._supports(AUTO_WB)):
+            self._try_set_multi(AUTO_WB, [1, 0.75], "AUTO_WB(恢复自动)")
+
+        # 能力记录
+        logger.debug(
+            f"WB caps -> AUTO:{self._supports(AUTO_WB)} TEMP:{self._supports(WB_TEMP)} "
+            f"BLUE_U:{self._supports(WB_BLUE_U)} RED_V:{self._supports(WB_RED_V)}"
+        )
+
+    # -------------------------- 应用控制 --------------------------
 
     def _apply_controls(self) -> None:
         """在 connect() 成功打开后调用，按推荐顺序应用所有可选控制"""
@@ -132,25 +244,30 @@ class Camera:
         # ---- 1) FourCC / 分辨率 / FPS / 缓冲（尽量先设）----
         if self._config.fourcc:
             try:
-                fourcc = cv2.VideoWriter_fourcc(*self._config.fourcc) # type: ignore
-                self._try_set(cv2.CAP_PROP_FOURCC, fourcc, f"FOURCC({self._config.fourcc})")
+                fourcc = cv2.VideoWriter_fourcc(*self._config.fourcc)  # type: ignore
+                self._try_set(getattr(cv2, "CAP_PROP_FOURCC", 6), fourcc, f"FOURCC({self._config.fourcc})")
             except Exception:
                 logger.debug("设置 FOURCC 失败，后端可能不支持")
 
         if self._config.buffersize is not None:
             try:
-                self._try_set(cv2.CAP_PROP_BUFFERSIZE, int(self._config.buffersize), "BUFFERSIZE")
+                self._try_set(getattr(cv2, "CAP_PROP_BUFFERSIZE", 38), int(self._config.buffersize), "BUFFERSIZE")
             except Exception:
                 pass
 
         # ---- 2) 曝光/增益（先关自动再设值）----
         self._set_exposure_smart()
 
+        # ---- 3) 白平衡 ----
+        self._set_white_balance_smart()
+
         # 回读并更新实际生效的宽高/FPS
-        real_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or (self.width or 0)
-        real_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or (self.height or 0)
-        real_fps = float(self.cap.get(cv2.CAP_PROP_FPS)) or (self.fps or 0.0)
+        real_w = int(self.cap.get(getattr(cv2, "CAP_PROP_FRAME_WIDTH", 3))) or (self.width or 0)
+        real_h = int(self.cap.get(getattr(cv2, "CAP_PROP_FRAME_HEIGHT", 4))) or (self.height or 0)
+        real_fps = float(self.cap.get(getattr(cv2, "CAP_PROP_FPS", 5))) or (self.fps or 0.0)
         self.width, self.height, self.fps = real_w, real_h, real_fps
+
+    # -------------------------- 连接 --------------------------
 
     def connect(self) -> bool:
         """连接设备并应用参数设置；回读实际参数"""
@@ -172,32 +289,34 @@ class Camera:
             if platform.system() == "Linux":
                 # 若未指定 fourcc，Linux 默认尝试 MJPG 提升带宽
                 if not self._config.fourcc:
-                    ok_fourcc = self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))  # type: ignore
+                    ok_fourcc = self.cap.set(getattr(cv2, "CAP_PROP_FOURCC", 6),
+                                             cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))  # type: ignore
                     if not ok_fourcc:
                         logger.debug("设置 MJPG FourCC 失败，后端可能不支持")
             elif self._config.fourcc:
                 # 其他平台如指定了四字符码，也尝试设置
                 try:
-                    self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*self._config.fourcc)) # type: ignore
+                    self.cap.set(getattr(cv2, "CAP_PROP_FOURCC", 6),
+                                 cv2.VideoWriter_fourcc(*self._config.fourcc))  # type: ignore
                 except Exception:
                     logger.debug("设置 FOURCC 失败，后端可能不支持")
 
             # 目标分辨率/FPS（先设再回读）
             if self.width and self.height:
-                ok_w = self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                ok_h = self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                ok_w = self.cap.set(getattr(cv2, "CAP_PROP_FRAME_WIDTH", 3), self.width)
+                ok_h = self.cap.set(getattr(cv2, "CAP_PROP_FRAME_HEIGHT", 4), self.height)
                 if not (ok_w and ok_h):
                     logger.debug("设置分辨率失败（后端可能不支持），将回读实际分辨率")
 
             if self.fps:
-                ok_fps = self.cap.set(cv2.CAP_PROP_FPS, float(self.fps))
+                ok_fps = self.cap.set(getattr(cv2, "CAP_PROP_FPS", 5), float(self.fps))
                 if not ok_fps:
                     logger.debug("设置 FPS 失败（后端可能不支持），将回读实际 FPS")
 
             # 缓冲区（可选）
             if self._config.buffersize is not None:
                 try:
-                    self.cap.set(cv2.CAP_PROP_BUFFERSIZE, int(self._config.buffersize))
+                    self.cap.set(getattr(cv2, "CAP_PROP_BUFFERSIZE", 38), int(self._config.buffersize))
                 except Exception:
                     pass
 

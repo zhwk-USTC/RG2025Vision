@@ -6,7 +6,7 @@ from typing import Optional, Callable
 
 from nicegui import ui
 
-CONSOLE_LOG_LEVEL = logging.INFO
+CONSOLE_LOG_LEVEL = logging.DEBUG
 FILE_LOG_LEVEL = logging.WARNING
 UI_LOG_LEVEL = logging.DEBUG
 

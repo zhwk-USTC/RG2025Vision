@@ -233,4 +233,9 @@ def turret_set_yaw(angle: float):
     send_kv({Var.TURRET_ANGLE_YAW: angle})
     time.sleep(1.0)  # 等待炮台转动到位
 
+def get_voltage() -> Optional[float]:
+    """获取当前电压值"""
+    send_kv({Var.GET_VOLTAGE: True})
+    return wait_for_value(Var.VOLTAGE, timeout=5.0)
+
 

@@ -22,7 +22,7 @@ class FireOnce:
         try:
             # 设置发射速度（如果指定）
             if self.fire_speed is not None:
-                set_fire_speed(self.fire_speed)
+                set_fire_speed(float(self.fire_speed))
                 set_debug_var('fire_speed_set', self.fire_speed, 
                              DebugLevel.INFO, DebugCategory.CONTROL, "发射速度已设置")
                 logger.info(f"[FireControl] 发射速度设置为: {self.fire_speed}")

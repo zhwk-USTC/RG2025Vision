@@ -95,6 +95,10 @@ variables:
 
   - name: fire_once         # 发射飞镖, 复合指令
     vtype: BOOL
+  - name: get_voltage
+    vtype: BOOL
+  - name: voltage            # 电压, 单位: V
+    vtype: F32
 
   - name: dart_push_once         # 推进飞镖向前,然后回到原位
     vtype: BOOL

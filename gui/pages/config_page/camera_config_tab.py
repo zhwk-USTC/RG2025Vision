@@ -245,24 +245,24 @@ def render_camera_block(key: str, cam: Camera):
                               ).props('dense').classes('col-span-2')
 
                     # --- 白平衡 ---
-                    with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):
-                        ui.label('白平衡').classes('text-primary text-bold')
-                        info_tip('关闭自动白平衡(AWB)后可设色温(K)。若设备不支持Kelvin，将自动回退为通道映射；此UI不做自动求增益。')
-                    with ui.grid(columns=2).classes('items-center gap-2'):
-                        ui.switch('关AWB', value=bool(cfg.auto_wb_off),
-                                  on_change=lambda e: setattr(cfg, 'auto_wb_off', bool(e.value))
-                                  ).props('dense')
-                        ui.number(label='色温(K)',
-                                  value=cfg.wb_temperature if cfg.wb_temperature is not None else None,
-                                  min=2800, max=6500, step=50,
-                                  on_change=lambda e: setattr(cfg, 'wb_temperature', int(e.value) if e.value else None)
-                                  ).props('dense')
+                    # with ui.row().classes('items-center justify-start q-mt-sm q-mb-none'):
+                    #     ui.label('白平衡').classes('text-primary text-bold')
+                    #     info_tip('关闭自动白平衡(AWB)后可设色温(K)。若设备不支持Kelvin，将自动回退为通道映射；此UI不做自动求增益。')
+                    # with ui.grid(columns=2).classes('items-center gap-2'):
+                    #     ui.switch('关AWB', value=bool(cfg.auto_wb_off),
+                    #               on_change=lambda e: setattr(cfg, 'auto_wb_off', bool(e.value))
+                    #               ).props('dense')
+                    #     ui.number(label='色温(K)',
+                    #               value=cfg.wb_temperature if cfg.wb_temperature is not None else None,
+                    #               min=2800, max=6500, step=50,
+                    #               on_change=lambda e: setattr(cfg, 'wb_temperature', int(e.value) if e.value else None)
+                    #               ).props('dense')
 
-                    with ui.row().classes('gap-1'):
-                        ui.button('室内(3200K)', on_click=lambda e: set_wb_preset(3200)).props('dense')
-                        ui.button('日光(5600K)', on_click=lambda e: set_wb_preset(5600)).props('dense')
+                    # with ui.row().classes('gap-1'):
+                    #     ui.button('室内(3200K)', on_click=lambda e: set_wb_preset(3200)).props('dense')
+                    #     ui.button('日光(5600K)', on_click=lambda e: set_wb_preset(5600)).props('dense')
 
-                    ui.button('写入白平衡(在线)', color='primary',
-                              on_click=lambda e: cam._set_white_balance_smart()
-                              ).props('dense').classes('col-span-2')
-                    ui.label('提示：固定色温便于多相机一致与后处理复现。').classes('text-caption text-grey-6')
+                    # ui.button('写入白平衡(在线)', color='primary',
+                    #           on_click=lambda e: cam._set_white_balance_smart()
+                    #           ).props('dense').classes('col-span-2')
+                    # ui.label('提示：固定色温便于多相机一致与后处理复现。').classes('text-caption text-grey-6')

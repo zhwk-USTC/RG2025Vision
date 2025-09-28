@@ -7,7 +7,7 @@ from typing import Optional, Callable
 from nicegui import ui
 
 CONSOLE_LOG_LEVEL = logging.DEBUG
-FILE_LOG_LEVEL = logging.WARNING
+FILE_LOG_LEVEL = logging.INFO
 UI_LOG_LEVEL = logging.DEBUG
 
 LOG_DIR = os.path.join(os.path.dirname(__file__), '../.log')

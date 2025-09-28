@@ -3,6 +3,9 @@ from ...utils.communicate_utils import set_fire_speed, fire_once, get_voltage
 from ...debug_vars_enhanced import set_debug_var, DebugLevel, DebugCategory
 from core.logger import logger
 
+# 基准电压常量 (V)
+NOMINAL_VOLTAGE = 25.0
+
 class FireOnce:
     """
     通用发射控制任务
@@ -13,27 +16,33 @@ class FireOnce:
         """
         参数：
         - fire_speed: 发射脉冲长度（1000-2000，如果为None则不设置）
-        - calibrate_voltage: 是否根据当前电压校正发射脉冲长度（标称电压24.0V）
+        - calibrate_voltage: 是否根据当前电压校正发射脉冲长度（标称电压{NOMINAL_VOLTAGE}V）
         """
-        self.fire_speed = fire_speed
+        self.fire_speed = float(fire_speed) if fire_speed is not None else None
         self.calibrate_voltage = calibrate_voltage
 
     def run(self) -> bool:
         logger.info(f"[FireControl] 开始发射控制，发射1次")
         
         try:
+            # 获取当前电压（用于记录）
+            current_voltage = get_voltage()
+            if current_voltage is not None:
+                logger.info(f"[FireControl] 当前电压: {current_voltage}V")
+                set_debug_var('current_voltage', current_voltage, 
+                             DebugLevel.INFO, DebugCategory.STATUS, "发射前电压")
+            
             # 设置发射速度（如果指定）
             speed_to_set = None
             if self.fire_speed is not None:
                 speed_to_set = self.fire_speed
                 if self.calibrate_voltage:
-                    current_voltage = get_voltage()
                     if current_voltage is not None and current_voltage > 0:
-                        # 电压校正：pulse_width_new = 1000 + (pulse_width_original - 1000) * (24.0 / current_voltage)
-                        speed_to_set = 1000 + (self.fire_speed - 1000) * (24.0 / current_voltage)
+                        # 电压校正：pulse_width_new = 1000 + (pulse_width_original - 1000) * (NOMINAL_VOLTAGE / current_voltage)
+                        speed_to_set = 1000 + (self.fire_speed - 1000) * (NOMINAL_VOLTAGE / current_voltage)
                         # 确保脉冲长度在有效范围内 (1000-2000)
                         speed_to_set = max(1000.0, min(2000.0, speed_to_set))
-                        logger.info(f"[FireControl] 电压校正：当前电压 {current_voltage}V，标称电压 24.0V，校正后脉冲长度 {speed_to_set}")
+                        logger.info(f"[FireControl] 电压校正：当前电压 {current_voltage}V，标称电压 {NOMINAL_VOLTAGE}V，校正后脉冲长度 {speed_to_set}")
                         set_debug_var('voltage_calibration', f"{current_voltage}V -> {speed_to_set}", 
                                      DebugLevel.INFO, DebugCategory.CONTROL, "电压校正已应用")
                     else:

@@ -1,7 +1,7 @@
 from .common.print import print_node
 from .common.delay import delay
 from .base_align_to_apriltag import BaseAlignToAprilTag
-from .base import BaseMove, BaseRotate, BaseStop, BaseRotateByAngle, BaseMoveFastEx
+from .base import BaseMove, BaseRotate, BaseStop, BaseRotateByAngle
 from .arm import (
     ArmReset,
     ArmHighToStore,
@@ -36,7 +36,6 @@ _TASK_NODE_CLASSES = {
     'base_rotate': BaseRotate,
     'base_stop': BaseStop,
     'base_rotate_by_angle': BaseRotateByAngle,
-    'base_move_fast_ex': BaseMoveFastEx,
     'arm_reset': ArmReset,
     'arm_high_to_store': ArmHighToStore,
     'arm_high_to_shot': ArmHighToShot,

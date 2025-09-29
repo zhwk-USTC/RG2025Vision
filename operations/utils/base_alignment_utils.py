@@ -23,6 +23,7 @@ DEFAULT_TOLERANCE_YAW = 0.01
 # 允许旋转的位移门槛
 ROT_GATE_TOLERANCE_M = 0.10
 
+
 class AlignmentUtils:
     """对齐控制相关工具函数（离散底盘指令版）"""
 
@@ -40,7 +41,7 @@ class AlignmentUtils:
         e_x = float(target_z) - float(pose.z)
 
         # 侧向误差
-        e_y = float(target_x)- float(pose.x)
+        e_y = float(target_x) - float(pose.x)
 
         import math
         yaw_diff = float(target_yaw) - float(pose.pitch)
@@ -61,9 +62,9 @@ class AlignmentUtils:
     ) -> bool:
         # e_x 对应 z 轴误差（前后），e_y 对应 x 轴误差（左右）
         return abs(e_x) < tolerance_z and abs(e_y) < tolerance_x and abs(e_yaw) < tolerance_yaw
-    
+
     @staticmethod
-    def get_move_dir(e_x: float, e_y: float, cam_key: CAM_KEY_TYPE) -> MoveDirection:
+    def get_move_dir(e_x: float, e_y: float, tol_x: float, tol_y: float, cam_key: CAM_KEY_TYPE) -> MoveDirection:
         """
         根据误差和相机类型生成移动命令
 
@@ -78,8 +79,11 @@ class AlignmentUtils:
         """
         ax, ay = abs(e_x), abs(e_y)
 
+        aex = max(ax-tol_x, 0.0)
+        aey = max(ay-tol_y, 0.0)
+
         # 选主轴（优先纠正更大的绝对误差）
-        use_x = (ax >= ay)
+        use_x = (aex >= aey)
 
         # 根据相机类型和误差方向选择移动命令
         if cam_key == "front":
@@ -108,12 +112,13 @@ class AlignmentUtils:
                     return 'backward'
 
     @staticmethod
-    def _move_discrete(e_x: float, e_y: float, cam_key: CAM_KEY_TYPE) -> None:
+    def _move_discrete(e_x: float, e_y: float, tol_x: float, tol_y: float, cam_key: CAM_KEY_TYPE) -> None:
         """
         根据 e_x / e_y 误差发出一次“平移”离散指令（动态脉冲时长）。
         """
         mag = max(abs(e_x), abs(e_y))
-        move_dir: MoveDirection = AlignmentUtils.get_move_dir(e_x, e_y, cam_key)
+        move_dir: MoveDirection = AlignmentUtils.get_move_dir(
+            e_x, e_y, tol_x, tol_y, cam_key)
         if move_dir:
             MovementUtils.execute_move_by_distance(move_dir, mag)
 
@@ -147,11 +152,12 @@ class AlignmentUtils:
 
         rotation_gate_x = max(ROT_GATE_TOLERANCE_M, tolerance_x)
         rotation_gate_z = max(ROT_GATE_TOLERANCE_M, tolerance_z)
-        
+
         in_rot_gate = (ax <= rotation_gate_x) and (az <= rotation_gate_z)
         # 没有在旋转门槛内，优先移动
         if not in_rot_gate:
-            AlignmentUtils._move_discrete(e_x, e_y, cam_key)
+            AlignmentUtils._move_discrete(
+                e_x, e_y, tolerance_z, tolerance_x, cam_key)
             return
         # 在旋转门槛内，优先旋转
         elif not yaw_aligned:
@@ -160,7 +166,8 @@ class AlignmentUtils:
         # 位置和角度都在门槛内，优先位置微调
         else:
             if not (x_aligned and z_aligned):
-                AlignmentUtils._move_discrete(e_x, e_y, cam_key)
+                AlignmentUtils._move_discrete(
+                    e_x, e_y,  tolerance_z, tolerance_x, cam_key)
                 return
 
         MovementUtils.stop_movement()
@@ -215,7 +222,8 @@ class AlignmentUtils:
             )
 
             # 调试：记录 pose 与误差
-            yaw_source = 'pitch' if hasattr(pose, 'pitch') and pose.pitch is not None else 'yaw'
+            yaw_source = 'pitch' if hasattr(
+                pose, 'pitch') and pose.pitch is not None else 'yaw'
             set_debug_var(
                 f'{debug_prefix}_pose_raw',
                 {
@@ -229,7 +237,8 @@ class AlignmentUtils:
             )
             set_debug_var(
                 f'{debug_prefix}_err',
-                {'ex': round(e_x, 3), 'ey': round(e_y, 3), 'eyaw': round(e_yaw, 3)},
+                {'ex': round(e_x, 3), 'ey': round(
+                    e_y, 3), 'eyaw': round(e_yaw, 3)},
                 DebugLevel.INFO, DebugCategory.POSITION, "与目标位置的误差"
             )
 
@@ -257,10 +266,12 @@ class AlignmentUtils:
         return True
 
 # 便捷函数
+
+
 def base_align_to_apriltag(
-    cam_key: CAM_KEY_TYPE, 
+    cam_key: CAM_KEY_TYPE,
     target_tag_families: str,
-    target_tag_ids: Optional[List[int]], 
+    target_tag_ids: Optional[List[int]],
     target_tag_size: float,
     target_z: float,
     target_x: float = 0.0,
@@ -274,11 +285,11 @@ def base_align_to_apriltag(
     """
     # 直接把列表传给 alignment_loop；归一化逻辑在内部完成
     return AlignmentUtils.apriltag_alignment_loop(
-        cam_key=cam_key, 
+        cam_key=cam_key,
         target_tag_families=target_tag_families,
         target_tag_ids=target_tag_ids,
         target_tag_size=target_tag_size,
-        target_z=target_z, 
+        target_z=target_z,
         debug_prefix="tag_align",
         task_name="TagAlign",
         target_x=target_x,

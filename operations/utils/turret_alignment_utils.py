@@ -21,14 +21,14 @@ from .communicate_utils import turret_set_yaw  # norm ∈ [-1, 1]
 # 方向常量：1 表示 norm↑→像素列↑；-1 表示 norm↑→像素列↓
 DIRECTION = 1
 
-PIX_TOL = 3          # 对齐像素容差
+PIX_TOL = 1          # 对齐像素容差
 SETTLE_SEC = 0.1     # 单步后额外稳定等待（set_turret_yaw内部已有1秒等待）
-MAX_ITERS = 60
+MAX_ITERS = 10
 MAX_RETRIES_PER_ITER = 10
 
 # —— P 控制参数（把像素误差映射为归一化步进）——
-KP = 0.8                 # 比例增益（对误差/图像宽度的系数）
-MAX_STEP_NORM = 0.20     # 单步最大归一化步进
+KP = 15                 # 比例增益（对误差/图像宽度的系数）
+MAX_STEP_NORM = 0.40     # 单步最大归一化步进
 MIN_STEP_NORM = 0.01     # 单步最小归一化步进（避免死区）
 SMALL_ERR_FRAC = 0.01    # 小误差区(相当于 1% 画面宽度)时允许更小步进，减抖
 
@@ -104,6 +104,7 @@ def turret_align_front_to_light_column(
         if u_px is None:
             set_debug_var(f"{debug_prefix}_status", "no_detection",
                           DebugLevel.WARNING, DebugCategory.STATUS, "未检测到灯")
+            logger.warning(f"[{task_name}] 未检测到灯，无法对齐")
             return False
 
         pix_err = u_px - target_px           # 像素误差（右正左负）
@@ -141,6 +142,7 @@ def turret_align_front_to_light_column(
                           "cur_norm": round(cur_norm, 5)
                       },
                       DebugLevel.INFO, DebugCategory.CONTROL, "P 控制一步")
+        logger.info(f"[{task_name}] 迭代 {it + 1}: u_px={u_px:.1f}, pix_err={pix_err:.1f}, step={step:.5f}, cur_norm={cur_norm:.3f}")
         time.sleep(SETTLE_SEC)
 
     set_debug_var(f"{debug_prefix}_status", "max_iters",

@@ -41,7 +41,8 @@ class FireOnce:
                         # 电压校正：pulse_width_new = 1000 + (pulse_width_original - 1000) * (NOMINAL_VOLTAGE / current_voltage)
                         speed_to_set = 1000 + (self.fire_speed - 1000) * (NOMINAL_VOLTAGE / current_voltage)
                         # 确保脉冲长度在有效范围内 (1000-2000)
-                        speed_to_set = max(1000.0, min(2000.0, speed_to_set))
+                        speed_to_set = max(1000.0, min(1300.0, speed_to_set))
+                        speed_to_set = round(speed_to_set)
                         logger.info(f"[FireControl] 电压校正：当前电压 {current_voltage}V，标称电压 {NOMINAL_VOLTAGE}V，校正后脉冲长度 {speed_to_set}")
                         set_debug_var('voltage_calibration', f"{current_voltage}V -> {speed_to_set}", 
                                      DebugLevel.INFO, DebugCategory.CONTROL, "电压校正已应用")

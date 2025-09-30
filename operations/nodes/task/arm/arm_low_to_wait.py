@@ -1,6 +1,7 @@
 from ....utils.communicate_utils import (
-    arm_reset_to_store,
-    arm_low_grip_to_wait_shot
+    arm_reset_to_low_prepare,
+    arm_low_prepare_to_grip,
+    arm_low_grip_to_wait_shot,
 )
 
 class ArmLowToWait:
@@ -9,7 +10,8 @@ class ArmLowToWait:
 
     def run(self) -> bool:
         try:
-            arm_reset_to_store()
+            arm_reset_to_low_prepare()
+            arm_low_prepare_to_grip()
             arm_low_grip_to_wait_shot()
             return True
         except Exception:

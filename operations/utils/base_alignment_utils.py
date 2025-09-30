@@ -241,6 +241,8 @@ class AlignmentUtils:
                     e_y, 3), 'eyaw': round(e_yaw, 3)},
                 DebugLevel.INFO, DebugCategory.POSITION, "与目标位置的误差"
             )
+            logger.info(
+                f"[{task_name}] 位置误差: ex={e_x:.3f}, ey={e_y:.3f}, eyaw={e_yaw:.3f} (rad)")
 
             if AlignmentUtils.is_aligned(
                 e_x, e_y, e_yaw,
@@ -252,6 +254,7 @@ class AlignmentUtils:
                 logger.info(f"[{task_name}] 已对齐到目标位置")
                 set_debug_var(f'{debug_prefix}_status', 'done',
                               DebugLevel.SUCCESS, DebugCategory.STATUS, f"已成功对齐到{task_name}")
+                logger.info(f"[{task_name}] 已对齐到目标位置")
                 break
 
             AlignmentUtils.execute_alignment_move(
@@ -262,6 +265,7 @@ class AlignmentUtils:
             )
             set_debug_var(f'{debug_prefix}_status', 'adjusting',
                           DebugLevel.INFO, DebugCategory.STATUS, f"正在调整位置对齐{task_name}")
+            logger.info(f"[{task_name}] 正在调整位置对齐...")
 
         return True
 

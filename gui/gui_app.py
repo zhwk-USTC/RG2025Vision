@@ -1,4 +1,3 @@
-import asyncio
 from nicegui import ui, app
 from typing import Optional, Callable, Awaitable
 from .pages import *

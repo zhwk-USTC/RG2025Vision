@@ -1,7 +1,4 @@
 # main.py
-import asyncio
-from typing import Optional
-
 from core.logger import logger
 from gui import launch as gui_launch
 from nicegui import app,background_tasks

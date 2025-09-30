@@ -1,6 +1,4 @@
 from typing import List, Dict, Optional
-import binascii
-import asyncio
 from serial.tools import list_ports
 from nicegui import ui
 from core.logger import logger

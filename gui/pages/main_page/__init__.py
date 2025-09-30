@@ -23,4 +23,4 @@ def render_main_page():
         'debug': ('调试参数', render_debug_panel),
     }
 
-    create_memorable_tabs(memory_key='tasks_panel_tabs', tab_configs=tab_configs, default_tab='single')
+    create_memorable_tabs(memory_key='tasks_panel_tabs', tab_configs=tab_configs, default_tab='flow')

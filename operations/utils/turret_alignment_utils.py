@@ -21,8 +21,8 @@ from .communicate_utils import turret_set_yaw  # norm ∈ [-1, 1]
 # 方向常量：1 表示 norm↑→像素列↑；-1 表示 norm↑→像素列↓
 DIRECTION = 1
 
-PIX_TOL = 1          # 对齐像素容差
-SETTLE_SEC = 0.1     # 单步后额外稳定等待（set_turret_yaw内部已有1秒等待）
+PIX_TOL = 2          # 对齐像素容差
+SETTLE_SEC = 0.5     # 单步后额外稳定等待
 MAX_ITERS = 10
 MAX_RETRIES_PER_ITER = 10
 

@@ -121,7 +121,10 @@ class AlignmentUtils:
         aex = max(ax-tol_x, 0.0)
         aey = max(ay-tol_y, 0.0)
 
-        mag = max(aex, aey)
+        if(aex >= aey):
+            mag = ax
+        else:
+            mag = ay
         return mag
 
     @staticmethod

@@ -25,11 +25,14 @@ class OperationNodeConfig:
       - 'target'：条件跳转目标锚点
       - 'note'：仅显示文字的注释节点（新增）
         - 建议将正文存放在 parameters['text'] 中
+      - 'subflow'：子流程节点
+      - 'return'：结束流程/子流程的节点
+        - parameters['return_value']: bool，默认为 True
     """
-    type: Literal["task", "condition", "target", "note", "subflow"]
-    id: str = ""    # 节点唯一标识（note 可留空或按需生成）
-    name: str = ""  # 节点名称（note 可做标题/留空）
-    parameters: Dict[str, Any] = field(default_factory=dict)  # 节点参数（note: 放置 'text' 等）
+    type: Literal["task", "condition", "target", "note", "subflow", "return"]
+    id: str = ""    # 节点唯一标识
+    name: str = ""  # 节点名称
+    parameters: Dict[str, Any] = field(default_factory=dict)  # 节点参数
 
 @dataclass
 class OperationConfig:

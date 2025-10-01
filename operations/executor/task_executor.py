@@ -107,7 +107,7 @@ class TaskExecutor:
                 params: Dict[str, Any] = getattr(node, 'parameters', {}) or {}
 
                 if node_type not in ('note', 'target'):
-                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id))  # 记录执行顺序（序号, 类名）
+                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id, params))  # 记录执行顺序（序号, 类名, 参数）
 
                 set_debug_var('current_node', node_id, DebugLevel.INFO, DebugCategory.STATUS,
                               f"当前节点：ID {node_id}, 类型 {node_type}, 类名 {class_name}")
@@ -135,12 +135,22 @@ class TaskExecutor:
                 elif node_type == 'target':
                     i += 1
 
+                elif node_type == 'return':
+                    return_value = params.get('return_value', True)
+                    if not isinstance(return_value, bool):
+                        return_value = True
+                    self.execution_context['last_result'] = return_value
+                    set_debug_var('execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
+                                  f"执行节点序号、类名和参数顺序: {self.execution_order}")
+                    logger.info(f"任务流程执行完成（return节点），节点顺序: {self.execution_order}")
+                    return return_value
+
                 else:
                     logger.warning(f"未知节点类型: {node_type}")
                     i += 1
 
             set_debug_var('execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
-                          f"执行节点序号和类名顺序: {self.execution_order}")
+                          f"执行节点序号、类名和参数顺序: {self.execution_order}")
             logger.info(f"任务流程执行完成，节点顺序: {self.execution_order}")
             return True
 
@@ -237,8 +247,6 @@ class TaskExecutor:
             return None
 
         self.execution_context[node_id] = result_bool
-        self.execution_context["last_result"] = result_bool
-
         set_debug_var(
             f"condition_{node_id}_result",
             result_bool,
@@ -372,7 +380,7 @@ class TaskExecutor:
                 params: Dict[str, Any] = getattr(node, 'parameters', {}) or {}
 
                 if node_type not in ('note', 'target'):
-                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id))  # 记录执行顺序（序号, 类名）
+                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id, params))  # 记录执行顺序（序号, 类名, 参数）
 
                 set_debug_var('current_subflow_node', node_id, DebugLevel.INFO, DebugCategory.STATUS,
                               f"当前子流程节点：ID {node_id}, 类型 {node_type}, 类名 {class_name}")
@@ -412,12 +420,21 @@ class TaskExecutor:
                 elif node_type == 'target':
                     i += 1
 
+                elif node_type == 'return':
+                    return_value = params.get('return_value', True)
+                    if not isinstance(return_value, bool):
+                        return_value = True
+                    self.execution_context['last_result'] = return_value
+                    set_debug_var('subflow_execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
+                                  f"子流程执行节点序号、类名和参数顺序: {self.execution_order}")
+                    return return_value
+
                 else:
                     logger.warning(f"未知节点类型: {node_type}")
                     i += 1
 
             set_debug_var('subflow_execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
-                          f"子流程执行节点序号和类名顺序: {self.execution_order}")
+                          f"子流程执行节点序号、类名和参数顺序: {self.execution_order}")
             return True
 
         except TaskStoppedException as e:

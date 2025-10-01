@@ -100,10 +100,10 @@ def _cfg_nodes_to_state(cfg):
         n_type = getattr(n, 'type', None)
         base = {'type': n_type, 'id': getattr(n, 'id', ''), 'name': getattr(n, 'name', '')}
         # 这里把 note 加进“有 parameters 的类型”
-        if n_type in ('task', 'condition', 'note', 'subflow'):
+        if n_type in ('task', 'condition', 'note', 'subflow', 'return'):
             base['parameters'] = dict(getattr(n, 'parameters', {}) or {})
         # 这里把 note 加进可加入的类型列表
-        if n_type in ('task', 'condition', 'target', 'note', 'subflow'):
+        if n_type in ('task', 'condition', 'target', 'note', 'subflow', 'return'):
             # 对于 subflow 节点，从 parameters 中提取 subflow_name 作为 name
             if n_type == 'subflow':
                 subflow_name = (getattr(n, 'parameters', {}) or {}).get('subflow_name', '')
@@ -300,6 +300,7 @@ def render_flow_panel(ctx: UIPanelContext):
         'target':  {'border': 'border-emerald-500', 'icon': 'flag',         'icon_cls': 'text-emerald-600', 'title_cls': 'text-emerald-700'},
         'note': {'border': 'border-violet-500', 'icon': 'sticky_note_2', 'icon_cls': 'text-violet-600', 'title_cls': 'text-violet-700'},
         'subflow': {'border': 'border-orange-500', 'icon': 'call_split',   'icon_cls': 'text-orange-600', 'title_cls': 'text-orange-700'},
+        'return':  {'border': 'border-red-500',     'icon': 'exit_to_app',  'icon_cls': 'text-red-600',     'title_cls': 'text-red-700'},
     }
 
     def _card_classes(kind: str) -> str:
@@ -559,6 +560,7 @@ def render_flow_panel(ctx: UIPanelContext):
     TYPE_TARGET = 'target'
     TYPE_NOTE = 'note'
     TYPE_SUBFLOW = 'subflow'
+    TYPE_RETURN = 'return'
 
     task_choices = list(_TASK_NODE_CLASSES.keys())
     cond_choices = list(_COND_NODE_CLASSES.keys())
@@ -611,6 +613,9 @@ def render_flow_panel(ctx: UIPanelContext):
                             item.setdefault('parameters', {})[pname] = v
                 if '__id_input' in item and hasattr(item['__id_input'], 'value'):
                     item['id'] = item['__id_input'].value
+            elif itype == TYPE_RETURN:
+                if '__return_sel' in item and hasattr(item['__return_sel'], 'value'):
+                    item.setdefault('parameters', {})['return_value'] = item['__return_sel'].value == 'True'
             elif itype == TYPE_NOTE:
                 if '__name_input' in item and hasattr(item['__name_input'], 'value'):
                     item['name'] = item['__name_input'].value or ''
@@ -769,6 +774,26 @@ def render_flow_panel(ctx: UIPanelContext):
                     # 回写引用
                     item['__id_input_target'] = id_in
                     
+    def _render_return_card(idx: int, item: dict):
+        kind = 'return'
+        return_value = (item.get('parameters') or {}).get('return_value', True)
+        with ui.card().classes(_card_classes(kind)):
+            with ui.card_section().classes('p-3'):
+                with ui.row().classes('items-center w-full gap-3 no-wrap'):
+                    ui.icon(STYLE[kind]['icon']).classes(STYLE[kind]['icon_cls'])
+                    ui.badge(str(idx + 1)).classes('shrink-0 text-base font-bold')
+                    _title_label('Return', kind)
+
+                    # 返回值选择下拉框
+                    return_sel = ui.select(['True', 'False'], value='True' if return_value else 'False',
+                                           label='返回值').props('dense outlined').classes('w-32')
+
+                    # 控制按钮
+                    _render_controls(idx)
+
+                # 回写引用
+                item['__return_sel'] = return_sel
+                    
     def _render_note_card(idx: int, item: dict):
         kind = 'note'
         note_id = item.get('id', '')
@@ -838,6 +863,8 @@ def render_flow_panel(ctx: UIPanelContext):
                     _render_note_card(idx, item)
                 elif t == TYPE_SUBFLOW:
                     _render_subflow_card(idx, item)
+                elif t == TYPE_RETURN:
+                    _render_return_card(idx, item)
                 else:
                     with ui.card().classes('w-full mb-2'):
                         with ui.card_section().classes('p-3'):
@@ -944,6 +971,17 @@ def render_flow_panel(ctx: UIPanelContext):
         })
         _render_items()
 
+    def _add_return_item():
+        _save_current_values()
+        next_idx = len([x for x in ctx.nodes_state if x.get('type') == TYPE_RETURN]) + 1
+        rid = f'return_{next_idx}'
+        ctx.nodes_state.append({
+            'type': TYPE_RETURN,
+            'id': rid,
+            'parameters': {'return_value': True},
+        })
+        _render_items()
+
     # ---- 保存配置 ----
     def _save_items():
         """UI -> cfg.nodes：保留显式 target 的原始顺序；缺失的 target 才在末尾自动补"""
@@ -1011,6 +1049,13 @@ def render_flow_panel(ctx: UIPanelContext):
                     new_nodes.append(OperationNodeConfig(type=TYPE_TARGET, id=t_id, name=t_name, parameters={}))
                     explicit_target_ids.add(t_id)
                 # else: 跳过无效 target（未找到同 id 的 condition）
+            elif t == TYPE_RETURN:
+                return_val = getattr(item.get('__return_sel'), 'value', (item.get('parameters') or {}).get('return_value', True)) \
+                            if item.get('__return_sel') else (item.get('parameters') or {}).get('return_value', True)
+                if isinstance(return_val, str):
+                    return_val = return_val == 'True'
+                params = {'return_value': return_val}
+                new_nodes.append(OperationNodeConfig(type=TYPE_RETURN, id=f'return_{idx}', name='', parameters=params)) # type: ignore
             elif t == TYPE_NOTE:
                 # 生成/读取 note 的 id（可留空，也可自动生成）
                 node_id = item.get('id') or f'note_{idx}'
@@ -1049,6 +1094,7 @@ def render_flow_panel(ctx: UIPanelContext):
         ui.button('新增条件节点', icon='add_alert', on_click=_add_condition_item).props('dense')
         ui.button('新增注释节点', icon='sticky_note_2', on_click=_add_note_item).props('dense')
         ui.button('新增子流程节点', icon='call_split', on_click=_add_subflow_item).props('dense')
+        ui.button('新增返回节点', icon='exit_to_app', on_click=_add_return_item).props('dense')
         ui.button('保存配置', color='primary', icon='save', on_click=_save_items).props('dense')
 
     # 初次渲染

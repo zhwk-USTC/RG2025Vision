@@ -16,7 +16,7 @@ from .base_movement_utils import MovementUtils, MoveDirection
 # ---------------------------
 
 # 平移误差阈值：小于该值认为在容差内
-DEFAULT_TOLERANCE_XY = 0.005
+DEFAULT_TOLERANCE_XY = 0.01
 # 角度误差阈值（弧度）
 DEFAULT_TOLERANCE_YAW = 0.01
 
@@ -112,20 +112,28 @@ class AlignmentUtils:
                     return 'backward'
 
     @staticmethod
+    def _get_move_distance(e_x: float, e_y: float, tol_x: float, tol_y: float) -> float:
+        """
+        根据误差和相机类型计算移动距离（米）
+        """
+        ax, ay = abs(e_x), abs(e_y)
+
+        aex = max(ax-tol_x, 0.0)
+        aey = max(ay-tol_y, 0.0)
+
+        mag = max(aex, aey)
+        return mag
+
+    @staticmethod
     def _move_discrete(e_x: float, e_y: float, tol_x: float, tol_y: float, cam_key: CAM_KEY_TYPE) -> None:
         """
         根据 e_x / e_y 误差发出一次“平移”离散指令（动态脉冲时长）。
         """
         move_dir = AlignmentUtils.get_move_dir(
             e_x, e_y, tol_x, tol_y, cam_key)
+        move_dist = AlignmentUtils._get_move_distance(e_x, e_y, tol_x, tol_y)
         if move_dir:
-            if move_dir in ('forward', 'backward'):
-                mag = abs(e_x)
-            elif move_dir in ('left', 'right'):
-                mag = abs(e_y)
-            else:
-                mag = 0.0  # 不应该发生
-            MovementUtils.execute_move_by_distance(move_dir, mag)
+            MovementUtils.execute_move_by_distance(move_dir, move_dist)
 
     @staticmethod
     def _rotate_discrete(e_yaw: float) -> None:
@@ -246,7 +254,7 @@ class AlignmentUtils:
                     e_y, 3), 'eyaw': round(e_yaw, 3)},
                 DebugLevel.INFO, DebugCategory.POSITION, "与目标位置的误差"
             )
-            
+
             if AlignmentUtils.is_aligned(
                 e_x, e_y, e_yaw,
                 tolerance_x=tolerance_x,

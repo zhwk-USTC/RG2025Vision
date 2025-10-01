@@ -8,9 +8,6 @@ from ..debug_vars_enhanced import set_debug_var, set_debug_image, DebugLevel, De
 class VisionUtils:
     """视觉相关工具函数"""
 
-    # 存储上一个检测到的AprilTag的中心坐标
-    _last_tag_center: Optional[List[float]] = None
-
     @staticmethod
     def check_vision_system(error_prefix: str = "vision_error") -> bool:
         vs = get_vision()
@@ -141,10 +138,10 @@ class VisionUtils:
                     time.sleep(retry_delay)
                     continue
 
-            # 仅选择最靠近图像中心列的那个
+            # 仅选择最右边的那个
             height, width = frame.shape[:2]
             center_x = width / 2
-            det = min(candidate_dets, key=lambda d: abs(getattr(d, 'center', [center_x, 0])[0] - center_x))
+            det = max(candidate_dets, key=lambda d: getattr(d, 'center', [0, 0])[0])
 
             set_debug_var(
                 f'{debug_prefix}_tag_id',

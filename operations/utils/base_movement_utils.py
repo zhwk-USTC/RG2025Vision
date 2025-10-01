@@ -12,19 +12,19 @@ from .communicate_utils import base_set_move, base_set_rotate, base_stop
 # ---------------------------
 
 # 平移脉冲最小/最大时长（秒）
-MOVE_PULSE_MIN_SEC = 0.05
-MOVE_PULSE_MAX_SEC = 2.00
+MOVE_PULSE_MIN_SEC = 0.15
+MOVE_PULSE_MAX_SEC = 3.00
 # 旋转脉冲最小/最大时长（秒）
-ROT_PULSE_MIN_SEC = 0.05
+ROT_PULSE_MIN_SEC = 0.07
 ROT_PULSE_MAX_SEC = 2.00
 
 # 速度参数（米/秒）
 MOVE_SPEED_SLOW_MPS = 0.1    # 慢速移动速度
-MOVE_SPEED_FAST_MPS = 0.5    # 快速移动速度
-MOVE_FAST_THR_M = 0.30      # 平移快慢阈值（m）
+MOVE_SPEED_FAST_MPS = 0.4    # 快速移动速度
+MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
 
 # 旋转速度参数（弧度/秒）
-ROT_SPEED_SLOW_RPS = 22 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
+ROT_SPEED_SLOW_RPS = 25 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
 ROT_SPEED_FAST_RPS = 45 * 3.141592653589793 / 180    # 快速旋转角速度 (45度/秒)
 ROT_FAST_THR_RAD = 0.50     # 旋转快慢阈值（rad）
 
@@ -53,7 +53,7 @@ class MovementUtils:
             move_cmd: 移动命令
             pulse_sec: 移动脉冲时长（秒）
         """
-        if not move_cmd or pulse_sec <= 0:
+        if not move_cmd:
             base_stop()
             return
         pulse_sec = max(MOVE_PULSE_MIN_SEC, pulse_sec)
@@ -72,7 +72,7 @@ class MovementUtils:
             pulse_sec: 旋转脉冲时长（秒）
         """
         pulse_sec = max(ROT_PULSE_MIN_SEC, pulse_sec)
-        if not rot_cmd or pulse_sec <= 0:
+        if not rot_cmd:
             base_stop()
             return
 
@@ -110,7 +110,7 @@ class MovementUtils:
             speed = MOVE_SPEED_FAST_MPS
 
         # 根据速度选择移动脉冲时长
-        pulse_sec = distance_m * 0.5 / speed
+        pulse_sec = (distance_m) / speed
 
         # 根据方向选择移动命令
         move_cmd = f"{move_dir}{speed_suffix}"
@@ -140,7 +140,7 @@ class MovementUtils:
             speed = ROT_SPEED_FAST_RPS
 
         # 根据速度选择旋转脉冲时长
-        pulse_sec = abs_angle_rad * 0.8 / speed
+        pulse_sec = (abs_angle_rad) * 0.9 / speed
 
         # 根据方向选择旋转命令
         rot_cmd = f"{rot_dir}{speed_suffix}"

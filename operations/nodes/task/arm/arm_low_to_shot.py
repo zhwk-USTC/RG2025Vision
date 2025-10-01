@@ -1,4 +1,5 @@
 from ....utils.communicate_utils import (
+    arm_reset,
     arm_reset_to_low_prepare,
     arm_low_prepare_to_grip,
     arm_low_grip_to_shot,
@@ -11,6 +12,7 @@ class ArmLowToShot:
 
     def run(self) -> bool:
         try:
+            arm_reset()
             arm_reset_to_low_prepare()
             arm_low_prepare_to_grip()
             arm_low_grip_to_shot()

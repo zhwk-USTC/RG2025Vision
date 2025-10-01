@@ -51,6 +51,7 @@ class TaskExecutor:
     def __init__(self):
         self.flow: List[OperationNodeConfig] = []
         self.execution_context: Dict[str, Any] = {}
+        self.execution_order: Optional[List] = None
 
     def load_from_config(self):
         """从配置文件加载执行流程"""
@@ -92,7 +93,7 @@ class TaskExecutor:
                 if getattr(n, "id", None) and getattr(n, "type", None) == "target"
             }
 
-            has_failed_tasks = False  # 跟踪是否有任务失败
+            self.execution_order = []  # 记录执行节点的顺序
 
             i = 0
             while i < len(self.flow):
@@ -105,6 +106,9 @@ class TaskExecutor:
                 class_name: str = getattr(node, 'name', '')  # OperationNode 的 name 字段即类名
                 params: Dict[str, Any] = getattr(node, 'parameters', {}) or {}
 
+                if node_type not in ('note', 'target'):
+                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id))  # 记录执行顺序（序号, 类名）
+
                 set_debug_var('current_node', node_id, DebugLevel.INFO, DebugCategory.STATUS,
                               f"当前节点：ID {node_id}, 类型 {node_type}, 类名 {class_name}")
 
@@ -112,11 +116,6 @@ class TaskExecutor:
                     ok = self._execute_task_node(node_id, class_name, params)
                     self.execution_context[node_id] = ok
                     self.execution_context['last_result'] = ok
-                    if not ok:
-                        has_failed_tasks = True
-                        set_debug_var('task_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
-                                      f"任务节点 {node_id} 执行失败，继续下一个任务")
-                        logger.warning(f"任务节点 {node_id} 执行失败，继续执行下一个任务")
                     i += 1
 
                 elif node_type == 'condition':
@@ -131,11 +130,6 @@ class TaskExecutor:
                     ok = self._execute_subflow_node(node_id, params)
                     self.execution_context[node_id] = ok
                     self.execution_context['last_result'] = ok
-                    if not ok:
-                        has_failed_tasks = True
-                        set_debug_var('subflow_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
-                                      f"子流程节点 {node_id} 执行失败，继续下一个任务")
-                        logger.warning(f"子流程节点 {node_id} 执行失败，继续执行下一个任务")
                     i += 1
                     
                 elif node_type == 'target':
@@ -145,17 +139,10 @@ class TaskExecutor:
                     logger.warning(f"未知节点类型: {node_type}")
                     i += 1
 
-            if has_failed_tasks:
-                set_debug_var('task_process_status', 'completed_with_failures',
-                              DebugLevel.WARNING, DebugCategory.STATUS,
-                              f"任务流程完成但有失败任务：共处理 {len(self.flow)} 个节点")
-                logger.warning("任务流程完成，但存在失败的任务")
-                return False
-            else:
-                set_debug_var('task_process_status', 'completed_normally',
-                              DebugLevel.SUCCESS, DebugCategory.STATUS,
-                              f"任务流程正常完成：共处理 {len(self.flow)} 个节点")
-                return True
+            set_debug_var('execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
+                          f"执行节点序号和类名顺序: {self.execution_order}")
+            logger.info(f"任务流程执行完成，节点顺序: {self.execution_order}")
+            return True
 
         except TaskStoppedException as e:
             set_debug_var('task_process_status', f'stopped: {e}', DebugLevel.WARNING, DebugCategory.STATUS,
@@ -330,6 +317,11 @@ class TaskExecutor:
             # 传递递归栈给子执行器
             sub_executor._recursion_stack = list(self._recursion_stack)
 
+            # 为子流程准备嵌套记录
+            self.execution_order.append([])
+            sub_list = self.execution_order[-1]
+            sub_executor.execution_order = sub_list
+
             # 执行子流程（不运行 system_init/cleanup，因为已经在主流程中运行）
             result = sub_executor._execute_flow_without_init_cleanup()
             set_debug_var('subflow_result', result, DebugLevel.INFO, DebugCategory.STATUS,
@@ -365,7 +357,8 @@ class TaskExecutor:
                 if getattr(n, "id", None) and getattr(n, "type", None) == "target"
             }
 
-            has_failed_tasks = False  # 跟踪是否有任务失败
+            if self.execution_order is None:
+                self.execution_order = []  # 记录执行节点的顺序
 
             i = 0
             while i < len(self.flow):
@@ -378,6 +371,9 @@ class TaskExecutor:
                 class_name: str = getattr(node, 'name', '')  # OperationNode 的 name 字段即类名
                 params: Dict[str, Any] = getattr(node, 'parameters', {}) or {}
 
+                if node_type not in ('note', 'target'):
+                    self.execution_order.append((len(self.execution_order) + 1, class_name or node_id))  # 记录执行顺序（序号, 类名）
+
                 set_debug_var('current_subflow_node', node_id, DebugLevel.INFO, DebugCategory.STATUS,
                               f"当前子流程节点：ID {node_id}, 类型 {node_type}, 类名 {class_name}")
 
@@ -385,11 +381,6 @@ class TaskExecutor:
                     ok = self._execute_task_node(node_id, class_name, params)
                     self.execution_context[node_id] = ok
                     self.execution_context['last_result'] = ok
-                    if not ok:
-                        has_failed_tasks = True
-                        set_debug_var('subflow_task_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
-                                      f"子流程任务节点 {node_id} 执行失败，继续下一个任务")
-                        logger.warning(f"子流程任务节点 {node_id} 执行失败，继续执行下一个任务")
                     i += 1
 
                 elif node_type == 'condition':
@@ -416,11 +407,6 @@ class TaskExecutor:
                         ok = self._execute_subflow_node(node_id, params)
                         self.execution_context[node_id] = ok
                         self.execution_context['last_result'] = ok
-                        if not ok:
-                            has_failed_tasks = True
-                            set_debug_var('nested_subflow_failed', node_id, DebugLevel.WARNING, DebugCategory.ERROR,
-                                          f"嵌套子流程节点 {node_id} 执行失败，继续下一个任务")
-                            logger.warning(f"嵌套子流程节点 {node_id} 执行失败，继续执行下一个任务")
                         i += 1
                     
                 elif node_type == 'target':
@@ -430,17 +416,9 @@ class TaskExecutor:
                     logger.warning(f"未知节点类型: {node_type}")
                     i += 1
 
-            if has_failed_tasks:
-                set_debug_var('subflow_process_status', 'completed_with_failures',
-                              DebugLevel.WARNING, DebugCategory.STATUS,
-                              f"子流程完成但有失败任务：共处理 {len(self.flow)} 个节点")
-                logger.warning("子流程完成，但存在失败的任务")
-                return False
-            else:
-                set_debug_var('subflow_process_status', 'completed_normally',
-                              DebugLevel.SUCCESS, DebugCategory.STATUS,
-                              f"子流程正常完成：共处理 {len(self.flow)} 个节点")
-                return True
+            set_debug_var('subflow_execution_order', self.execution_order, DebugLevel.INFO, DebugCategory.STATUS,
+                          f"子流程执行节点序号和类名顺序: {self.execution_order}")
+            return True
 
         except TaskStoppedException as e:
             set_debug_var('subflow_process_status', f'stopped: {e}', DebugLevel.WARNING, DebugCategory.STATUS,

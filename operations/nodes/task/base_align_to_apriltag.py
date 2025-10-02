@@ -1,5 +1,6 @@
 from typing import Optional, List
 from ...utils.base_alignment_utils import base_align_to_apriltag, DEFAULT_TOLERANCE_XY, DEFAULT_TOLERANCE_YAW
+import ast
 
 class BaseAlignToAprilTag:
     """用 AprilTag 位姿闭环，让底盘移动到飞镖架下方并保持距离"""
@@ -19,8 +20,15 @@ class BaseAlignToAprilTag:
         # 归一化：确保 tag_ids 是 List[int] 或 None
         if tag_ids is not None:
             try:
-                tag_ids = [int(x) for x in tag_ids]
-                if len(tag_ids) == 0:
+                # 如果是字符串，尝试解析为列表
+                if isinstance(tag_ids, str):
+                    tag_ids = ast.literal_eval(tag_ids)
+                # 确保是列表，并转换为 int
+                if isinstance(tag_ids, list):
+                    tag_ids = [int(x) for x in tag_ids]
+                    if len(tag_ids) == 0:
+                        tag_ids = None
+                else:
                     tag_ids = None
             except Exception:
                 tag_ids = None

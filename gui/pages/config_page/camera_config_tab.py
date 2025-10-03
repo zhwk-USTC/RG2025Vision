@@ -231,7 +231,7 @@ def render_camera_block(key: str, cam: Camera):
                                   ).props('dense').classes('col-span-1')
                         ui.number(label='曝光(raw)',
                                   value=cfg.exposure if cfg.exposure is not None else None,
-                                  step=1,
+                                  step=0.1,
                                   on_change=lambda e: setattr(cfg, 'exposure', float(e.value) if e.value else None)
                                   ).props('dense')
                         ui.number(label='增益',

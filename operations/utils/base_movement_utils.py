@@ -24,7 +24,7 @@ MOVE_SPEED_FAST_MPS = 0.4    # 快速移动速度
 MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
 
 # 旋转速度参数（弧度/秒）
-ROT_SPEED_SLOW_RPS = 25 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
+ROT_SPEED_SLOW_RPS = 30 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
 ROT_SPEED_FAST_RPS = 45 * 3.141592653589793 / 180    # 快速旋转角速度 (45度/秒)
 ROT_FAST_THR_RAD = 0.50     # 旋转快慢阈值（rad）
 
@@ -140,7 +140,7 @@ class MovementUtils:
             speed = ROT_SPEED_FAST_RPS
 
         # 根据速度选择旋转脉冲时长
-        pulse_sec = (abs_angle_rad) * 0.9 / speed
+        pulse_sec = (abs_angle_rad-0.01) * 0.9 / speed
 
         # 根据方向选择旋转命令
         rot_cmd = f"{rot_dir}{speed_suffix}"

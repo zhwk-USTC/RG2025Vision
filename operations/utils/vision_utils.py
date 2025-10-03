@@ -59,8 +59,8 @@ class VisionUtils:
         target_tag_families: str,
         target_tag_ids: Optional[List[int]] = None,
         target_tag_size: Optional[float] = None,
-        max_retries: int = 20,
-        retry_delay: float = 0.05,
+        max_retries: int = 5,
+        retry_delay: float = 0.1,
         debug_prefix: str = "tag",
         debug_description: str = "标签检测"
     ):

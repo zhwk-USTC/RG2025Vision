@@ -12,7 +12,7 @@ from .communicate_utils import base_set_move, base_set_rotate, base_stop
 # ---------------------------
 
 # 平移脉冲最小/最大时长（秒）
-MOVE_PULSE_MIN_SEC = 0.15
+MOVE_PULSE_MIN_SEC = 0.12
 MOVE_PULSE_MAX_SEC = 3.00
 # 旋转脉冲最小/最大时长（秒）
 ROT_PULSE_MIN_SEC = 0.07
@@ -24,7 +24,7 @@ MOVE_SPEED_FAST_MPS = 0.4    # 快速移动速度
 MOVE_FAST_THR_M = 0.12      # 平移快慢阈值（m）
 
 # 旋转速度参数（弧度/秒）
-ROT_SPEED_SLOW_RPS = 30 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
+ROT_SPEED_SLOW_RPS = 25 * 3.141592653589793 / 180    # 慢速旋转角速度 (22度/秒)
 ROT_SPEED_FAST_RPS = 45 * 3.141592653589793 / 180    # 快速旋转角速度 (45度/秒)
 ROT_FAST_THR_RAD = 0.50     # 旋转快慢阈值（rad）
 
@@ -110,7 +110,7 @@ class MovementUtils:
             speed = MOVE_SPEED_FAST_MPS
 
         # 根据速度选择移动脉冲时长
-        pulse_sec = (distance_m) / speed
+        pulse_sec = (distance_m-0.01) / speed
 
         # 根据方向选择移动命令
         move_cmd = f"{move_dir}{speed_suffix}"

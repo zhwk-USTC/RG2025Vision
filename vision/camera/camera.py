@@ -1,13 +1,34 @@
+# camera.py
+"""
+设备层相机实现（完整文件）
+- 基于 OpenCV VideoCapture
+- 支持跨平台的曝光/白平衡/四字符码/缓冲设置
+- 内置线程化读取：后台线程持续读取最新帧供主线程立即获取（降低读取阻塞与感知延迟）
+- 使用方式：
+    cam = Camera(config=CameraConfig(index=0, width=1280, height=720, fps=30, buffersize=1))
+    cam.select_by_index(0)
+    cam.connect()
+    cam.start_reader()                # 启动后台读取（可选）
+    frame = cam.read_frame()          # 立即返回最新一帧（RGB）
+    cam.stop_reader()
+    cam.disconnect()
+"""
+
+from __future__ import annotations
+
 import cv2
 import numpy as np
 import time
 import platform
 import math
+import threading
 from typing import Optional, Any, Iterable
 from dataclasses import dataclass
 
+# 请确保项目中存在这些模块（或按需替换 logger）
 from .manager import CameraInfo, get_camera_info_list
 from core.logger import logger
+
 
 @dataclass(slots=True)
 class CameraConfig:
@@ -34,6 +55,7 @@ class CameraConfig:
 class Camera:
     """
     设备层相机：负责连接、采帧与基本参数维护。
+    增加了线程化读取支持（start_reader / stop_reader / read_frame）。
     """
 
     def __init__(self, config: Optional[CameraConfig] = None) -> None:
@@ -50,6 +72,13 @@ class Camera:
         # 保存完整配置以用于应用专业参数
         self._config: CameraConfig = config if config else CameraConfig()
 
+        # 线程化读取相关
+        self._reader_thread: Optional[threading.Thread] = None
+        self._reader_running: bool = False
+        self._frame_lock = threading.Lock()
+        self._latest_frame: Optional["cv2.typing.MatLike"] = None  # RGB 格式
+        self._frame_event = threading.Event()  # 用于等待第一帧或阻塞读取
+
         if config:
             try:
                 self.select_by_index(config.index)
@@ -61,7 +90,7 @@ class Camera:
             self.height = config.height
             self.fps = config.fps
 
-    # -------------------------- 连接/断开 --------------------------
+    # -------------------------- 选择 --------------------------
 
     def select_by_info(self, info: CameraInfo) -> None:
         """通过 CameraInfo 选择摄像头"""
@@ -76,6 +105,8 @@ class Camera:
             raise IndexError(f"无效的摄像头索引: {camera_index}")
         self.select_by_info(cam_info_list[camera_index])
 
+    # -------------------------- 属性 --------------------------
+
     @property
     def is_open(self) -> bool:
         return bool(self.connected and self.cap is not None and self.cap.isOpened())
@@ -88,7 +119,6 @@ class Camera:
             ok = self.cap.set(prop, float(value))
             r = self.cap.get(prop)
             logger.debug(f"{name}: set {value} -> read {r} (ok={ok})")
-            # 某些驱动会四舍五入到最近合法值，不做苛刻等值判断
             return ok
         except Exception as e:
             logger.debug(f"{name}: 设置异常 {e}")
@@ -149,9 +179,6 @@ class Camera:
     def _k_to_blue_red(self, k: int, lo: int = 0, hi: int = 4096) -> tuple[int, int]:
         """
         将色温(K)近似映射为 BLUE_U / RED_V 的寄存器值（简单线性映射，不做自动求增益）。
-        设定：
-          - 3000K 近似为暖光：RED_V 高、BLUE_U 低
-          - 6500K 近似为日光：BLUE_U 高、RED_V 适中
         """
         k = max(3000, min(6500, int(k)))
         # 归一化到 [0,1]
@@ -168,10 +195,7 @@ class Camera:
 
     def _set_white_balance_smart(self) -> None:
         """
-        白平衡的跨平台设置（无自动求增益版）：
-        - 若关闭自动白平衡，优先尝试设置 Kelvin 色温；
-        - 若设备不支持 Kelvin，则回退到 BLUE_U/RED_V 的固定映射；
-        - 若既未提供色温又关闭了自动，则把 BLUE_U/RED_V 设为中性基准。
+        白平衡的跨平台设置（无自动求增益版）。
         """
         assert self.cap is not None
 
@@ -334,7 +358,10 @@ class Camera:
             # 设置状态
             self.connected = True
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # 不自动写入 latest_frame，交由 reader 线程或手动 read_frame 决定
             logger.info(f"已连接 {self.info.name} ({self.width}x{self.height} @ {self.fps:.1f}fps)")
+            # 清理事件（尚未启动线程）
+            self._frame_event.clear()
             return True
 
         except Exception as e:
@@ -344,6 +371,12 @@ class Camera:
 
     def disconnect(self) -> None:
         """断开设备连接并清空运行时状态"""
+        # 停止 reader 线程（如果在跑）
+        try:
+            self.stop_reader()
+        except Exception:
+            pass
+
         try:
             if self.cap is not None:
                 self.cap.release()
@@ -351,22 +384,108 @@ class Camera:
             self.cap = None
         self.connected = False
 
+        # 清空 latest frame
+        with self._frame_lock:
+            self._latest_frame = None
+        self._frame_event.clear()
+
         if self.info:
             logger.info(f"已断开 {self.info.name}")
         else:
             logger.info("已断开摄像头")
 
-    # -------------------------- 采帧 --------------------------
+    # -------------------------- 采帧（线程化） --------------------------
 
-    def read_frame(self) -> "cv2.typing.MatLike":
-        """读取一帧图像，返回 RGB"""
+    def start_reader(self) -> None:
+        """启动后台读取线程（若未启动）。线程会持续读取并保存最新帧（RGB）。"""
         if not self.is_open:
-            raise RuntimeError("摄像头未连接")
-        ret, frame = self.cap.read()  # type: ignore[union-attr]
-        if not ret:
-            raise RuntimeError("读取摄像头帧失败")
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        return frame
+            raise RuntimeError("摄像头未连接，无法启动读取线程")
+        if self._reader_running:
+            return
+        self._reader_running = True
+        self._reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
+        self._reader_thread.start()
+        logger.info("摄像头后台读取线程已启动")
+
+    def stop_reader(self, wait: bool = True, timeout: float = 1.0) -> None:
+        """停止后台读取线程。默认等待线程结束（timeout 秒）。"""
+        if not self._reader_running:
+            return
+        self._reader_running = False
+        # 唤醒可能在等待的 event
+        self._frame_event.set()
+        if self._reader_thread and wait:
+            self._reader_thread.join(timeout=timeout)
+        self._reader_thread = None
+        logger.info("摄像头后台读取线程已停止")
+
+    def _reader_loop(self) -> None:
+        """后台循环：持续调用 cap.read()，保存最新帧（RGB）。"""
+        assert self.cap is not None
+        # 取一个合理的间隔，避免 busy-loop（以 fps 为基准的 2x 读取速率）
+        sleep_interval = max(0.001, 1.0 / max(1.0, (self.fps or 30.0) * 2.0))
+
+        while self._reader_running and self.is_open:
+            try:
+                ret, frame = self.cap.read()
+                if not ret:
+                    # 读取失败时短暂休眠并重试
+                    time.sleep(0.005)
+                    continue
+                # 转为 RGB 并保存最新帧（线程安全）
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                with self._frame_lock:
+                    # 存储副本以避免外部修改内部缓存
+                    try:
+                        self._latest_frame = frame_rgb.copy()
+                    except Exception:
+                        self._latest_frame = frame_rgb
+                # 确保首次帧可被等待者收到
+                if not self._frame_event.is_set():
+                    self._frame_event.set()
+                # 控制抓帧速率/避免 100% 占用
+                time.sleep(sleep_interval)
+            except Exception as e:
+                logger.debug(f"_reader_loop 异常: {e}")
+                time.sleep(0.01)
+
+    def read_frame(self, block: bool = False, timeout: Optional[float] = None) -> "cv2.typing.MatLike":
+        """
+        读取一帧并返回 RGB：
+        - 如果后台线程已启动：默认 (block=False) 返回最新帧（非阻塞），若还没有任何帧则抛错或根据 block 等待。
+        - 如果后台线程未启动：行为回退为直接调用 cap.read()（同步读取）。
+        参数:
+          block: 若为 True 且当前没有帧，可等待直到第一帧或 timeout。
+          timeout: 等待的最长秒数（None 表示无限等到第一帧）。
+        """
+        # 若线程在跑，从 latest_frame 取
+        if self._reader_running:
+            # 等待第一帧（可选阻塞）
+            if not self._frame_event.is_set():
+                if not block:
+                    raise RuntimeError("尚无帧（后台线程已启动但尚未收到第一帧）")
+                ok = self._frame_event.wait(timeout=timeout)
+                if not ok:
+                    raise RuntimeError("等待摄像头第一帧超时")
+            with self._frame_lock:
+                if self._latest_frame is None:
+                    raise RuntimeError("尚无帧")
+                # 返回副本避免调用方修改内部缓存
+                try:
+                    return self._latest_frame.copy()
+                except Exception:
+                    return self._latest_frame
+        else:
+            # 未启动线程：降级到同步读取（原来的行为）
+            if not self.is_open:
+                raise RuntimeError("摄像头未连接")
+            ret, frame = self.cap.read()  # type: ignore[union-attr]
+            if not ret:
+                raise RuntimeError("读取摄像头帧失败")
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return frame
+
+    # -------------------------- 辅助/工具 --------------------------
 
     def get_config(self) -> CameraConfig:
         if not self.info:
@@ -386,14 +505,14 @@ class Camera:
         )
 
     def __str__(self) -> str:
-        return ('Camera: '+
-                '\nname: '+ str(self.info.name if self.info else "未知") +
-                '\nindex: '+ str(self.info.index if self.info else -1) +
-                '\nconnected: '+ str(self.connected) +
-                '\nwidth: '+ str(self.width) +
-                '\nheight: '+ str(self.height) +
-                '\nfps: '+ str(self.fps)
-        )
+        return ('Camera: ' +
+                '\nname: ' + str(self.info.name if self.info else "未知") +
+                '\nindex: ' + str(self.info.index if self.info else -1) +
+                '\nconnected: ' + str(self.connected) +
+                '\nwidth: ' + str(self.width) +
+                '\nheight: ' + str(self.height) +
+                '\nfps: ' + str(self.fps)
+                )
 
     @property
     def name(self) -> str:
@@ -405,3 +524,4 @@ class Camera:
 
     def get_status(self) -> str:
         return self.__str__()
+

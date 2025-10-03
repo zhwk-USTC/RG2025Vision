@@ -138,10 +138,10 @@ class VisionUtils:
                     time.sleep(retry_delay)
                     continue
 
-            # 仅选择最右边的那个
+            # 仅选择最左边的那个
             height, width = frame.shape[:2]
             center_x = width / 2
-            det = max(candidate_dets, key=lambda d: getattr(d, 'center', [0, 0])[0])
+            det = min(candidate_dets, key=lambda d: getattr(d, 'center', [0, 0])[0])
 
             set_debug_var(
                 f'{debug_prefix}_tag_id',
